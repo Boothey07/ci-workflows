@@ -57,3 +57,5 @@ Private repos get 2000 Actions minutes/month and **macOS bills at 10×**, so iOS
 builds are the expensive ones. Note that personal accounts cannot have
 account-level runners — GitHub scopes them per-repo unless you use an
 organization, so each repo needs its own registration.
+
+<!-- guard negative test -->
