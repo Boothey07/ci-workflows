@@ -79,11 +79,19 @@ Squash only. Linear history. Delete the branch after merge.
 | PR hygiene | yes | branch name, PR title, linked issue |
 | Secrets (gitleaks) | yes | GitHub's own scanning is public-repo-only without GHAS |
 | Lint (`ruff check`) | yes | |
-| Format (`ruff format --check`) | yes | |
 | Compile | yes | byte-compiles every module |
 | Test | only where tests exist | see below |
+| Format (`ruff format --check`) | advisory by default | `strict-format: true` to enforce |
 | Types (`mypy`) | advisory | blocking `mypy` on untyped code trains you to ignore CI |
 | Dependency audit | advisory | |
+
+**On formatting:** `format` starts advisory for the same reason as `mypy`. The
+existing repos are not `ruff format` clean — `bjj-health-app/api` alone had 3 files
+that would be reformatted. A gate that is red from day one on pre-existing code
+gets ignored, not fixed. The path to strict is: format the repo in one dedicated
+commit, then set `strict-format: true` for that repo. Do it per-repo, when the
+repo is quiet — not in the middle of a stack of open PRs, where reformatting
+guarantees conflicts.
 
 **On tests:** only four repos have a real suite — `system-configs` (47 test files),
 `openclaw-workspace` (42), `briefing-suite` (25), `bjj-readiness-platform` (9).

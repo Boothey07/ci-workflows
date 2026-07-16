@@ -43,6 +43,14 @@ on:
         description: 'Make mypy blocking. Off by default: a wall of red on untyped code trains you to ignore CI.'
         type: boolean
         default: false
+      strict-format:
+        description: >-
+          Make `ruff format --check` blocking. Off by default for the same reason as
+          strict-types: existing repos are not format-clean, and a gate that is red
+          from day one on pre-existing code gets ignored rather than fixed. Turn this
+          on per-repo once its history has been formatted in a dedicated commit.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -61,8 +69,9 @@ jobs:
         run: ruff check --output-format=github ${{ inputs.paths }}
 
   format:
-    name: Format
+    name: Format${{ inputs.strict-format && '' || ' (advisory)' }}
     runs-on: ${{ fromJSON(inputs.runs-on) }}
+    continue-on-error: ${{ !inputs.strict-format }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -70,7 +79,16 @@ jobs:
           python-version: "3.12"
       - run: pip install "ruff==${{ inputs.ruff-version }}"
       - name: ruff format --check
-        run: ruff format --check --diff ${{ inputs.paths }}
+        run: |
+          if ruff format --check --diff ${{ inputs.paths }}; then
+            exit 0
+          fi
+          if [ "${{ inputs.strict-format }}" = "true" ]; then
+            echo "::error::Formatting differs. Run: ruff format ${{ inputs.paths }}"
+            exit 1
+          fi
+          echo "::warning::Formatting differs — advisory only. Run: ruff format ${{ inputs.paths }}"
+          echo "Set strict-format: true once this repo has been formatted."
 
   compile:
     name: Compile (py${{ matrix.python }})
