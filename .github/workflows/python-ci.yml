@@ -51,14 +51,22 @@ on:
           on per-repo once its history has been formatted in a dedicated commit.
         type: boolean
         default: false
+      strict-lint:
+        description: >-
+          Make `ruff check` blocking. Defaults TRUE — lint is the gate worth keeping
+          real. Set false only for a repo with measured pre-existing debt, and say how
+          much in a comment so it stays visible instead of quietly permanent.
+        type: boolean
+        default: true
 
 permissions:
   contents: read
 
 jobs:
   lint:
-    name: Lint
+    name: Lint${{ inputs.strict-lint && '' || ' (advisory)' }}
     runs-on: ${{ fromJSON(inputs.runs-on) }}
+    continue-on-error: ${{ !inputs.strict-lint }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -66,7 +74,16 @@ jobs:
           python-version: "3.12"
       - run: pip install "ruff==${{ inputs.ruff-version }}"
       - name: ruff check
-        run: ruff check --output-format=github ${{ inputs.paths }}
+        run: |
+          if ruff check --output-format=github ${{ inputs.paths }}; then
+            exit 0
+          fi
+          if [ "${{ inputs.strict-lint }}" = "true" ]; then
+            echo "::error::Lint failed."
+            exit 1
+          fi
+          echo "::warning::Lint failed — advisory for this repo (pre-existing debt)."
+          echo "Fix the backlog, then set strict-lint: true."
 
   format:
     name: Format${{ inputs.strict-format && '' || ' (advisory)' }}
