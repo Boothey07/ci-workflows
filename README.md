@@ -16,18 +16,32 @@ on:
 
 jobs:
   hygiene:
-    uses: Boothey07/ci-workflows/.github/workflows/pr-hygiene.yml@v1.1
+    uses: Boothey07/ci-workflows/.github/workflows/pr-hygiene.yml@v1.4
   secrets:
-    uses: Boothey07/ci-workflows/.github/workflows/secrets.yml@v1.1
+    uses: Boothey07/ci-workflows/.github/workflows/secrets.yml@v1.4
   python:
-    uses: Boothey07/ci-workflows/.github/workflows/python-ci.yml@v1.1
+    uses: Boothey07/ci-workflows/.github/workflows/python-ci.yml@v1.4
     with:
       paths: "api/"
       python-versions: '["3.11","3.12","3.13"]'
 ```
 
-Pin `@v1.1` (the `v1` tag carries a gitleaks permissions bug). Consumers pinned to a moving `main` means one bad edit here breaks
-every repo simultaneously.
+**Pin `@v1.4`.** Pinning consumers to a moving `main` means one bad edit here
+breaks every repo at once.
+
+### Tag history — read before pinning
+
+Moving or deleting a published tag is a force-push, so bad tags are superseded
+rather than rewritten. They are left in place deliberately; this table is the
+record.
+
+| Tag | Use? | Why |
+|---|---|---|
+| `v1` | ❌ | gitleaks 403s — a reusable workflow does not inherit the caller's `permissions:` |
+| `v1.1` | ⚠️ | Works, but every Lint/Format job is mislabelled "(advisory)" whether blocking or not |
+| `v1.2` | ⚠️ | Adds `strict-lint`; same mislabelling |
+| `v1.3` | ❌ | **Junk — identical to v1.2.** Tagged from the wrong commit after a failed commit. Ignore. |
+| `v1.4` | ✅ | Correct labels; `apply-rulesets.sh` requires check names that actually report |
 
 ## What's here
 
