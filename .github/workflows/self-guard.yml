@@ -1,0 +1,17 @@
+name: Guard
+
+# Dogfood: this repo is where direct pushes to main actually happen (bootstrap),
+# so it is the honest place to prove the guard fires.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  guard:
+    uses: ./.github/workflows/guard.yml
+    with:
+      branches: "main"
