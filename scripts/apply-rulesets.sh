@@ -33,14 +33,26 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-# Checks that must pass before a PR can merge. These names must match the job
-# names produced by the reusable workflows, or the ruleset will wait forever on
-# a check that never reports.
+# Checks that must pass before a PR can merge.
+#
+# These strings must match the reported check names EXACTLY, or the ruleset waits
+# forever on a check that never reports and nothing can ever merge.
+#
+# Two traps, both verified against a real run:
+#  1. A reusable workflow's jobs are reported as "<caller-job-key> / <job-name>",
+#     e.g. "python / Lint" — NOT "Lint". The caller keys (hygiene/secrets/python)
+#     come from templates/ci.yml; a repo that renames them must edit this list.
+#  2. Advisory jobs report as "Lint (advisory)" / "Format (advisory)", which are
+#     different contexts. Never require those — they are continue-on-error and
+#     would be green regardless, so requiring them buys nothing.
+#
+# Compile is deliberately absent: its name carries the matrix value
+# ("python / Compile (py3.12)") and varies per repo, so it cannot be listed
+# generically. Add it per-repo if you want it required.
 REQUIRED_CHECKS=(
-  "PR hygiene"
-  "Secrets"
-  "Lint"
-  "Format"
+  "hygiene / PR hygiene"
+  "secrets / Secrets"
+  "python / Lint"
 )
 
 ruleset_payload() {

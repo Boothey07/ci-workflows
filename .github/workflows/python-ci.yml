@@ -64,7 +64,10 @@ permissions:
 
 jobs:
   lint:
-    name: Lint${{ inputs.strict-lint && '' || ' (advisory)' }}
+    # NOT `inputs.x && '' || ' (advisory)'` — GitHub expressions treat '' as falsy,
+    # so that form ALWAYS returns the right-hand side and every job was mislabelled
+    # "(advisory)" even when it was blocking. Both branches must be non-empty.
+    name: ${{ inputs.strict-lint && 'Lint' || 'Lint (advisory)' }}
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     continue-on-error: ${{ !inputs.strict-lint }}
     steps:
@@ -86,7 +89,7 @@ jobs:
           echo "Fix the backlog, then set strict-lint: true."
 
   format:
-    name: Format${{ inputs.strict-format && '' || ' (advisory)' }}
+    name: ${{ inputs.strict-format && 'Format' || 'Format (advisory)' }}
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     continue-on-error: ${{ !inputs.strict-format }}
     steps:
