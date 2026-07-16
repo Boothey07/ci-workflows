@@ -16,11 +16,11 @@ on:
 
 jobs:
   hygiene:
-    uses: Boothey07/ci-workflows/.github/workflows/pr-hygiene.yml@v1
+    uses: Boothey07/ci-workflows/.github/workflows/pr-hygiene.yml@v1.1
   secrets:
-    uses: Boothey07/ci-workflows/.github/workflows/secrets.yml@v1
+    uses: Boothey07/ci-workflows/.github/workflows/secrets.yml@v1.1
   python:
-    uses: Boothey07/ci-workflows/.github/workflows/python-ci.yml@v1
+    uses: Boothey07/ci-workflows/.github/workflows/python-ci.yml@v1.1
     with:
       paths: "api/"
       python-versions: '["3.11","3.12","3.13"]'
