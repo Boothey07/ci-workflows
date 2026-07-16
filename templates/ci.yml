@@ -1,0 +1,30 @@
+# Copy to .github/workflows/ci.yml in a consumer repo and adjust `with:`.
+#
+# pull_request ONLY — adding `push` as well double-bills every PR.
+name: CI
+
+on:
+  pull_request:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+jobs:
+  hygiene:
+    uses: Boothey07/ci-workflows/.github/workflows/pr-hygiene.yml@v1
+
+  secrets:
+    uses: Boothey07/ci-workflows/.github/workflows/secrets.yml@v1
+
+  python:
+    uses: Boothey07/ci-workflows/.github/workflows/python-ci.yml@v1
+    with:
+      paths: "."
+      python-versions: '["3.11","3.12","3.13"]'
+      # Stay off billed minutes where a runner is registered for this repo:
+      # runs-on: '["self-hosted","linux","vps"]'
+      #
+      # Only turn this on where tests actually exist. A green "Test" job that
+      # ran nothing is worse than no job at all — it reads as coverage.
+      run-tests: false

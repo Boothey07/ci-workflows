@@ -1,0 +1,148 @@
+name: Python CI (reusable)
+
+# Central Python CI. Consumers call this with ~8 lines; see templates/ci.yml.
+# Deliberately triggered by the CALLER on pull_request only — never on push too,
+# which would double-bill every PR.
+
+on:
+  workflow_call:
+    inputs:
+      paths:
+        description: 'Space-separated paths to lint/compile (e.g. "api/ tools/"). Defaults to the repo root.'
+        type: string
+        default: "."
+      python-versions:
+        description: 'JSON array of Python versions for the compile matrix.'
+        type: string
+        default: '["3.12"]'
+      runs-on:
+        description: 'JSON runner label array. Use ["self-hosted","linux","vps"] to stay off billed minutes.'
+        type: string
+        default: '["ubuntu-latest"]'
+      ruff-version:
+        description: 'Pinned ruff version. Pinned so a ruff release cannot turn CI red on its own.'
+        type: string
+        default: "0.15.21"
+      run-tests:
+        description: 'Run pytest. Only enable where tests actually exist — a vacuous gate is worse than none.'
+        type: boolean
+        default: false
+      test-command:
+        description: 'Test command, when run-tests is true.'
+        type: string
+        default: "pytest -q"
+      install-command:
+        description: 'Dependency install, when run-tests is true (e.g. pip install -e ".[dev]").'
+        type: string
+        default: ""
+      coverage-threshold:
+        description: 'Fail under this coverage %. 0 disables.'
+        type: number
+        default: 0
+      strict-types:
+        description: 'Make mypy blocking. Off by default: a wall of red on untyped code trains you to ignore CI.'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "ruff==${{ inputs.ruff-version }}"
+      - name: ruff check
+        run: ruff check --output-format=github ${{ inputs.paths }}
+
+  format:
+    name: Format
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "ruff==${{ inputs.ruff-version }}"
+      - name: ruff format --check
+        run: ruff format --check --diff ${{ inputs.paths }}
+
+  compile:
+    name: Compile (py${{ matrix.python }})
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ${{ fromJSON(inputs.python-versions) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Byte-compile every module
+        run: python -m compileall -q ${{ inputs.paths }}
+
+  test:
+    name: Test
+    if: inputs.run-tests
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          if [ -n "${{ inputs.install-command }}" ]; then
+            ${{ inputs.install-command }}
+          else
+            pip install pytest pytest-cov
+          fi
+      - name: Run tests
+        run: |
+          if [ "${{ inputs.coverage-threshold }}" != "0" ]; then
+            ${{ inputs.test-command }} --cov --cov-report=term-missing \
+              --cov-fail-under=${{ inputs.coverage-threshold }}
+          else
+            ${{ inputs.test-command }}
+          fi
+
+  types:
+    name: Types (advisory)
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    continue-on-error: ${{ !inputs.strict-types }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install mypy
+      - name: mypy
+        run: mypy --ignore-missing-imports --no-error-summary ${{ inputs.paths }} || ${{ inputs.strict-types && 'exit 1' || 'echo "advisory only — not blocking"' }}
+
+  audit:
+    name: Dependency audit (advisory)
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pip-audit
+      - name: pip-audit
+        run: |
+          shopt -s nullglob
+          reqs=(requirements*.txt)
+          if [ ${#reqs[@]} -gt 0 ]; then
+            for r in "${reqs[@]}"; do pip-audit -r "$r" || true; done
+          elif [ -f pyproject.toml ]; then
+            pip-audit || true
+          else
+            echo "no dependency manifest — nothing to audit"
+          fi

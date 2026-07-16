@@ -1,0 +1,76 @@
+name: Direct-push guard (reusable)
+
+# HONEST SCOPE: this is DETECTION, not prevention.
+#
+# GitHub Free + private repos have no branch protection and no rulesets, so a
+# direct `git push main` cannot be blocked. This workflow notices after the fact
+# and files an issue so the push is at least visible rather than silent.
+#
+# It is NOT a substitute for a ruleset. When Pro is purchased, run
+# scripts/apply-rulesets.sh and this becomes redundant.
+
+on:
+  workflow_call:
+    inputs:
+      branches:
+        description: 'Comma-separated protected-by-convention branches.'
+        type: string
+        default: "main,dev"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  guard:
+    name: Direct-push guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Was this push a merge from a PR?
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          BRANCH: ${{ github.ref_name }}
+          BRANCHES: ${{ inputs.branches }}
+        run: |
+          if ! printf '%s' ",$BRANCHES," | grep -q ",$BRANCH,"; then
+            echo "branch $BRANCH not guarded"; echo "direct=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # If the commit is associated with a merged PR, it arrived legitimately.
+          prs=$(gh api "repos/$REPO/commits/$SHA/pulls" \
+                  -H "Accept: application/vnd.github.groot-preview+json" --jq 'length' 2>/dev/null || echo 0)
+          if [ "${prs:-0}" -gt 0 ]; then
+            echo "commit came from a PR — OK"; echo "direct=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Direct push to $BRANCH with no associated PR"
+            echo "direct=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: File an issue for the direct push
+        if: steps.check.outputs.direct == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          BRANCH: ${{ github.ref_name }}
+          ACTOR: ${{ github.actor }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          short=$(printf '%s' "$SHA" | cut -c1-7)
+          # Build the body in a file: a heredoc inside a YAML block scalar has to
+          # stay indented, and an unindented EOF silently breaks the whole workflow.
+          {
+            printf '`%s` pushed [`%s`](%s/%s/commit/%s) straight to `%s` ' \
+              "$ACTOR" "$short" "$GITHUB_SERVER_URL" "$REPO" "$SHA" "$BRANCH"
+            printf 'with no pull request, so the merge checks never ran.\n\n'
+            printf 'This is detection after the fact - on GitHub Free the push could not be blocked.\n'
+            printf 'Buying GitHub Pro and running `apply-rulesets.sh` would make this impossible '
+            printf 'rather than merely visible.\n\n'
+            printf 'Guard run: %s\n' "$RUN"
+          } > /tmp/guard-body.md
+          gh issue create --repo "$REPO" \
+            --title "Direct push to $BRANCH bypassed CI ($short)" \
+            --body-file /tmp/guard-body.md \
+            || echo "::warning::could not file issue (issues may be disabled)"

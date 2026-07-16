@@ -1,0 +1,96 @@
+name: PR hygiene (reusable)
+
+# Enforces the conventions: branch naming, Conventional-Commit PR titles, and a
+# real linked issue. This is the "tagging with issues" gate — it resolves the
+# issue number via the API rather than trusting the branch name to be honest.
+
+on:
+  workflow_call:
+    inputs:
+      require-issue:
+        description: 'Require <type>/<issue#>-<slug> and verify the issue exists and is open.'
+        type: boolean
+        default: true
+      types:
+        description: 'Pipe-separated allowed branch/commit types.'
+        type: string
+        default: "feat|fix|chore|docs|refactor|test|perf|ci|deps|hotfix"
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  hygiene:
+    name: PR hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - name: Branch name
+        env:
+          BRANCH: ${{ github.head_ref }}
+          TYPES: ${{ inputs.types }}
+          REQUIRE_ISSUE: ${{ inputs.require-issue }}
+        run: |
+          echo "branch: $BRANCH"
+          # Bot branches are exempt — we don't control how they're named.
+          if printf '%s' "$BRANCH" | grep -qE '^(dependabot|coderabbitai|renovate)/'; then
+            echo "bot branch — exempt"; exit 0
+          fi
+          if [ "$REQUIRE_ISSUE" = "true" ]; then
+            pattern="^($TYPES)/[0-9]+-[a-z0-9][a-z0-9-]*$"
+            hint="<type>/<issue#>-<slug>   e.g. feat/42-injury-tracker"
+          else
+            pattern="^($TYPES)/[a-z0-9][a-z0-9-]*$"
+            hint="<type>/<slug>   e.g. feat/injury-tracker"
+          fi
+          if ! printf '%s' "$BRANCH" | grep -qE "$pattern"; then
+            echo "::error::Branch '$BRANCH' does not match: $hint"
+            echo "::error::Allowed types: $TYPES"
+            exit 1
+          fi
+          echo "branch name OK"
+
+      - name: PR title (Conventional Commits)
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          TYPES: ${{ inputs.types }}
+        run: |
+          echo "title: $TITLE"
+          # Squash-merge means this title becomes the commit on main — so it's
+          # the thing worth policing, not individual topic-branch commits.
+          if ! printf '%s' "$TITLE" | grep -qE "^($TYPES)(\([a-z0-9._-]+\))?!?: .+"; then
+            echo "::error::PR title must be a Conventional Commit: <type>(<scope>): <description>"
+            echo "::error::e.g. feat(ios): add injury tracker"
+            exit 1
+          fi
+          echo "title OK"
+
+      - name: Linked issue exists and is open
+        if: inputs.require-issue
+        env:
+          BRANCH: ${{ github.head_ref }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          if printf '%s' "$BRANCH" | grep -qE '^(dependabot|coderabbitai|renovate)/'; then
+            echo "bot branch — exempt"; exit 0
+          fi
+          num=$(printf '%s' "$BRANCH" | sed -E 's|^[a-z]+/([0-9]+)-.*|\1|')
+          echo "issue: #$num"
+          state=$(gh api "repos/$REPO/issues/$num" --jq '.state' 2>/dev/null || echo "MISSING")
+          if [ "$state" = "MISSING" ]; then
+            echo "::error::Issue #$num does not exist. File the issue before branching."
+            exit 1
+          fi
+          # A PR is a kind of issue to the API; reject that to stop branch/PR number mixups.
+          is_pr=$(gh api "repos/$REPO/issues/$num" --jq 'has("pull_request")' 2>/dev/null)
+          if [ "$is_pr" = "true" ]; then
+            echo "::error::#$num is a pull request, not an issue."
+            exit 1
+          fi
+          if [ "$state" != "open" ]; then
+            echo "::error::Issue #$num is $state. Branch against an open issue."
+            exit 1
+          fi
+          echo "issue #$num is open"

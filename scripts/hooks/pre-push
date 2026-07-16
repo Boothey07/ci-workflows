@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+#
+# pre-push — a speed bump, not a gate.
+#
+# On GitHub Free + private repos there is no server-side branch protection, so
+# this is the only thing standing between you and a direct push to main/dev.
+# It is trivially bypassed with `git push --no-verify`. That is by design: it
+# exists to catch the absent-minded push, not a determined one.
+#
+# Install:  ci-workflows/scripts/install-hooks.sh /path/to/repo
+
+set -u
+
+PROTECTED="main dev master"
+BRANCH_RE='^(feat|fix|chore|docs|refactor|test|perf|ci|deps|hotfix)/[0-9]+-[a-z0-9][a-z0-9-]*$'
+
+red() { printf '\033[31m%s\033[0m\n' "$1"; }
+yel() { printf '\033[33m%s\033[0m\n' "$1"; }
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "${remote_ref:-}" ] && continue
+  branch="${remote_ref#refs/heads/}"
+
+  for p in $PROTECTED; do
+    if [ "$branch" = "$p" ]; then
+      red "BLOCKED: direct push to '$branch'."
+      echo
+      echo "  Open a pull request instead — that is where the checks run."
+      echo "    git switch -c feat/<issue#>-<slug>"
+      echo "    git push -u origin HEAD"
+      echo "    gh pr create --base dev"
+      echo
+      yel "  Override (and skip every check):  git push --no-verify"
+      exit 1
+    fi
+  done
+
+  # Warn, don't block: the branch is already named, and failing here is just noise.
+  case "$branch" in
+    dependabot/*|coderabbitai/*|renovate/*) ;;
+    *)
+      if ! printf '%s' "$branch" | grep -qE "$BRANCH_RE"; then
+        yel "WARNING: '$branch' doesn't match <type>/<issue#>-<slug>"
+        yel "         e.g. feat/42-injury-tracker — PR hygiene CI will fail on this."
+      fi
+      ;;
+  esac
+done
+
+exit 0
