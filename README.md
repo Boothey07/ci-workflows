@@ -26,7 +26,7 @@ jobs:
       python-versions: '["3.11","3.12","3.13"]'
 ```
 
-Pin `@v1`. Consumers pinned to a moving `main` means one bad edit here breaks
+Pin `@v1.1` (the `v1` tag carries a gitleaks permissions bug). Consumers pinned to a moving `main` means one bad edit here breaks
 every repo simultaneously.
 
 ## What's here
