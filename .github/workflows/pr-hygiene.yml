@@ -37,6 +37,13 @@ jobs:
           if printf '%s' "$BRANCH" | grep -qE '^(dependabot|coderabbitai|renovate)/'; then
             echo "bot branch — exempt"; exit 0
           fi
+          # Promotion PRs (dev -> main) have head 'dev', a long-lived branch that
+          # legitimately doesn't fit <type>/<issue#>-<slug>. Exempt the integration
+          # branches from the name/issue checks; their PR title is still policed.
+          if [ "$BRANCH" = "dev" ] || [ "$BRANCH" = "develop" ] || [ "$BRANCH" = "staging" ]; then
+            echo "integration branch '$BRANCH' — promotion PR, name/issue checks skipped"
+            exit 0
+          fi
           if [ "$REQUIRE_ISSUE" = "true" ]; then
             pattern="^($TYPES)/[0-9]+-[a-z0-9][a-z0-9-]*$"
             hint="<type>/<issue#>-<slug>   e.g. feat/42-injury-tracker"
@@ -75,6 +82,9 @@ jobs:
         run: |
           if printf '%s' "$BRANCH" | grep -qE '^(dependabot|coderabbitai|renovate)/'; then
             echo "bot branch — exempt"; exit 0
+          fi
+          if [ "$BRANCH" = "dev" ] || [ "$BRANCH" = "develop" ] || [ "$BRANCH" = "staging" ]; then
+            echo "integration branch '$BRANCH' — promotion PR, issue check skipped"; exit 0
           fi
           num=$(printf '%s' "$BRANCH" | sed -E 's|^[a-z]+/([0-9]+)-.*|\1|')
           echo "issue: #$num"
