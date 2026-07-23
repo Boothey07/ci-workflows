@@ -1,0 +1,66 @@
+name: Quality Gate (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      results:
+        description: "JSON form of the caller job's needs context."
+        type: string
+        required: true
+      required-jobs:
+        description: "Comma-separated caller job IDs that must be present."
+        type: string
+        default: ""
+      allow-skipped:
+        description: "Treat skipped upstream jobs as acceptable."
+        type: boolean
+        default: false
+      runs-on:
+        type: string
+        default: '["ubuntu-latest"]'
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Quality Gate
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    steps:
+      - name: Aggregate upstream results
+        env:
+          RESULTS: ${{ inputs.results }}
+          REQUIRED_JOBS: ${{ inputs.required-jobs }}
+          ALLOW_SKIPPED: ${{ inputs.allow-skipped }}
+        shell: python
+        run: |
+          import json
+          import os
+          import sys
+
+          results = json.loads(os.environ["RESULTS"])
+          required = {
+              value.strip()
+              for value in os.environ["REQUIRED_JOBS"].split(",")
+              if value.strip()
+          }
+          missing = sorted(required - results.keys())
+          if missing:
+              print(f"::error::Required jobs did not report: {', '.join(missing)}")
+
+          allowed = {"success"}
+          if os.environ["ALLOW_SKIPPED"].lower() == "true":
+              allowed.add("skipped")
+
+          failed = []
+          for job, payload in sorted(results.items()):
+              result = payload.get("result", "missing")
+              print(f"{job}: {result}")
+              if result not in allowed:
+                  failed.append(f"{job}={result}")
+
+          if missing or failed:
+              if failed:
+                  print(f"::error::Blocking upstream results: {', '.join(failed)}")
+              sys.exit(1)
+          print("QUALITY GATE: PASSED")

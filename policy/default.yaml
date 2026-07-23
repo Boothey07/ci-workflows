@@ -1,0 +1,84 @@
+version: 1
+
+repository:
+  remote: origin
+  protected_branches:
+    - main
+    - master
+    - dev
+    - develop
+    - "release/**"
+
+branches:
+  types:
+    - feat
+    - fix
+    - chore
+    - docs
+    - refactor
+    - test
+    - perf
+    - ci
+    - deps
+    - hotfix
+  require_issue: true
+  slug_pattern: "[a-z0-9][a-z0-9-]*"
+  bot_patterns:
+    - "dependabot/**"
+    - "coderabbitai/**"
+    - "renovate/**"
+
+pull_requests:
+  require_pull_request: true
+  deny_drafts: true
+  require_current_head_sha: true
+  require_mergeable: true
+  require_up_to_date: true
+  target_rules:
+    - source: "hotfix/**"
+      targets: [main, master]
+    - source: "dev"
+      targets: [main]
+    - source: "develop"
+      targets: [master]
+    - source: "**"
+      targets: [dev, develop]
+
+checks:
+  required:
+    - "*Quality Gate*"
+  success_conclusions:
+    - SUCCESS
+    - NEUTRAL
+  block_any_pending: true
+  block_any_failure: true
+
+reviews:
+  require_no_unresolved_threads: true
+  coderabbit:
+    required: true
+    check_patterns:
+      - "*CodeRabbit*"
+
+merge:
+  method: squash
+  delete_branch: true
+  deny_admin_bypass: true
+
+agents:
+  harnesses:
+    claude-code:
+      adapter: claude-code
+      command: claude
+    codex:
+      adapter: codex
+      command: codex
+    opencode:
+      adapter: opencode
+      command: opencode
+    reasonix:
+      adapter: reasonix
+      command: reasonix
+    zcode:
+      adapter: zcode
+      command: zcode

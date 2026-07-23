@@ -1,0 +1,7 @@
+{
+  "name": "codex",
+  "command": "codex",
+  "instruction_file": "AGENTS.md",
+  "role": "Thin adapter only; all policy is rendered from policy/default.yaml.",
+  "optional_native_control": "Codex instructions supplement oak-agent; they do not reimplement policy."
+}

@@ -1,0 +1,43 @@
+name: Oak Policy CI
+
+on:
+  pull_request:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  hygiene:
+    uses: ./.github/workflows/pr-hygiene.yml
+
+  secrets:
+    uses: ./.github/workflows/secrets.yml
+
+  test:
+    name: Test oak-policy (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install ".[dev]"
+      - run: ruff check src tests bin
+      - run: pytest
+      - run: oak-policy validate
+
+  quality-gate:
+    name: Quality Gate
+    if: always()
+    needs: [hygiene, secrets, test]
+    uses: ./.github/workflows/quality-gate.yml
+    with:
+      results: ${{ toJSON(needs) }}
+      required-jobs: hygiene,secrets,test
