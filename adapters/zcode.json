@@ -1,0 +1,7 @@
+{
+  "name": "zcode",
+  "command": "zcode",
+  "instruction_file": "AGENTS.md",
+  "role": "Thin adapter only; all policy is rendered from policy/default.yaml.",
+  "optional_native_control": "Use the shared oak-agent launcher even when no native pre-command hook is available."
+}

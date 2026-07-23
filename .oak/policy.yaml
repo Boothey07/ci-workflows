@@ -1,0 +1,8 @@
+# This repository has no dev branch, so its topic branches target main directly.
+# Consumer repositories keep the default topic -> dev -> main model.
+pull_requests:
+  target_rules:
+    - source: "hotfix/**"
+      targets: [main]
+    - source: "**"
+      targets: [main]

@@ -12,13 +12,13 @@ permissions:
 
 jobs:
   hygiene:
-    uses: Boothey07/ci-workflows/.github/workflows/pr-hygiene.yml@v1.1
+    uses: Boothey07/ci-workflows/.github/workflows/pr-hygiene.yml@v2
 
   secrets:
-    uses: Boothey07/ci-workflows/.github/workflows/secrets.yml@v1.1
+    uses: Boothey07/ci-workflows/.github/workflows/secrets.yml@v2
 
   python:
-    uses: Boothey07/ci-workflows/.github/workflows/python-ci.yml@v1.1
+    uses: Boothey07/ci-workflows/.github/workflows/python-ci.yml@v2
     with:
       paths: "."
       python-versions: '["3.11","3.12","3.13"]'
@@ -28,3 +28,12 @@ jobs:
       # Only turn this on where tests actually exist. A green "Test" job that
       # ran nothing is worse than no job at all — it reads as coverage.
       run-tests: false
+
+  quality-gate:
+    name: Quality Gate
+    if: always()
+    needs: [hygiene, secrets, python]
+    uses: Boothey07/ci-workflows/.github/workflows/quality-gate.yml@v2
+    with:
+      results: ${{ toJSON(needs) }}
+      required-jobs: hygiene,secrets,python

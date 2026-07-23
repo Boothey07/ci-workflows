@@ -13,18 +13,24 @@ GET repos/Boothey07/<any-private-repo>/rulesets
 → 403 "Upgrade to GitHub Pro or make this repository public to enable this feature."
 ```
 
-So a direct `git push main` **cannot be blocked**. What exists instead:
+So GitHub itself cannot block a direct `git push main`. What exists instead:
 
 | Layer | What it does | Can you bypass it? |
 |---|---|---|
 | CI checks on PRs | Run and report red/green | Yes — by not opening a PR |
-| `pre-push` hook | Refuses pushes to `main`/`dev` locally | Yes — `git push --no-verify` |
+| `oak-git` | Refuses unsafe pushes and merges after checking live GitHub state | Yes — by using credentials outside the gateway |
+| `oak-agent` | Removes raw push/merge commands from supported harness sessions | Yes — by launching the harness directly |
+| portable `pre-push` hook | Refuses protected, invalid, and non-fast-forward refs locally | Yes — `git push --no-verify` |
 | `guard.yml` | Files an issue after a direct push | It's detection, not prevention |
 | **Rulesets** | **Would actually block** | **Requires GitHub Pro (~$4/mo)** |
 
-Everything below is written so that buying Pro and running
+Oak Policy is the binding route for agent-driven changes, but it does not claim
+to be GitHub server-side protection. A human in the web UI or an unguarded
+credential can still bypass it. The guard workflow makes that bypass visible.
+
+Everything remains compatible with buying Pro and running
 `scripts/apply-rulesets.sh --apply` turns convention into enforcement with no
-other changes. Until then this is a smoke alarm, not a lock.
+other changes.
 
 ## Branch model
 
@@ -70,7 +76,16 @@ fix(api): report readiness delta only vs a true previous day
 
 ## Merging
 
-Squash only. Linear history. Delete the branch after merge.
+Squash only. Linear history. Delete the branch after merge. Agents must use
+`oak-git merge`, which also verifies:
+
+- the local and PR head SHAs match;
+- the target is allowed for the source branch;
+- the branch includes the latest target-branch commit;
+- every configured check exists and succeeded;
+- CodeRabbit completed;
+- no review conversations remain unresolved;
+- the PR is open, non-draft, and mergeable.
 
 ## The checks
 
@@ -81,6 +96,7 @@ Squash only. Linear history. Delete the branch after merge.
 | Lint (`ruff check`) | yes | |
 | Compile | yes | byte-compiles every module |
 | Test | only where tests exist | see below |
+| Aggregate Quality Gate | yes | stable result required by `oak-git merge` |
 | Format (`ruff format --check`) | advisory by default | `strict-format: true` to enforce |
 | Types (`mypy`) | advisory | blocking `mypy` on untyped code trains you to ignore CI |
 | Dependency audit | advisory | |
@@ -103,10 +119,13 @@ worse than no job, because it reads as coverage.
 ## Local setup
 
 ```bash
-ci-workflows/scripts/install-hooks.sh --all ~/Developer
+python -m pip install "git+https://github.com/Boothey07/ci-workflows.git"
+cd /path/to/repository
+oak-policy install --harness all
+oak-policy doctor
 ```
 
 ## Adding CI to a repo
 
 Copy `templates/ci.yml` to `.github/workflows/ci.yml` and adjust `with:`. Consumers
-pin `@v1` so one bad edit here can't break every repo at once.
+pin a released tag so one bad edit here cannot break every repo at once.
