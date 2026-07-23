@@ -316,6 +316,19 @@ def wait_for_review(policy: Policy, timeout: int, interval: int = 15) -> Decisio
 def _waiting_can_help(decision: Decision) -> bool:
     if decision.details.get("unresolved_threads", 0):
         return False
+    permanent_markers = (
+        "is still a draft",
+        "local HEAD",
+        "not up to date",
+        "review conversation",
+        "may target",
+        "does not match",
+        "concluded failure",
+        "concluded cancelled",
+        "concluded timed_out",
+    )
+    if any(marker in blocker for blocker in decision.blockers for marker in permanent_markers):
+        return False
     if decision.details.get("mergeable", "").upper() == "UNKNOWN":
         return True
     checks = decision.details.get("checks", [])

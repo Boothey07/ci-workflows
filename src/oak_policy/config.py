@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from jsonschema import Draft202012Validator
 
 from .adapters import load_adapter
 from .errors import ConfigurationError
@@ -78,17 +77,7 @@ def _deep_merge(base: Policy, overlay: Policy) -> Policy:
 
 
 def validate_policy(policy: Policy) -> None:
-    """Validate the structural invariants used by the engine."""
-    schema = json.loads(schema_path().read_text(encoding="utf-8"))
-    errors = sorted(
-        Draft202012Validator(schema).iter_errors(policy),
-        key=lambda item: [str(part) for part in item.path],
-    )
-    if errors:
-        error = errors[0]
-        location = ".".join(str(part) for part in error.path) or "<root>"
-        raise ConfigurationError(f"Policy schema error at {location}: {error.message}")
-
+    """Validate the structural invariants required by every gateway command."""
     required_sections = {
         "repository",
         "branches",
@@ -134,6 +123,21 @@ def validate_policy(policy: Policy) -> None:
         adapter = load_adapter(config["adapter"])
         if adapter["name"] != config["adapter"]:
             raise ConfigurationError(f"Harness '{harness}' has an invalid adapter")
+
+
+def validate_against_schema(policy: Policy) -> None:
+    """Run full JSON-Schema validation on the explicit policy-validation path."""
+    from jsonschema import Draft202012Validator
+
+    schema = json.loads(schema_path().read_text(encoding="utf-8"))
+    errors = sorted(
+        Draft202012Validator(schema).iter_errors(policy),
+        key=lambda item: [str(part) for part in item.path],
+    )
+    if errors:
+        error = errors[0]
+        location = ".".join(str(part) for part in error.path) or "<root>"
+        raise ConfigurationError(f"Policy schema error at {location}: {error.message}")
 
 
 def load_policy(start: Path | None = None, explicit: Path | None = None) -> Policy:

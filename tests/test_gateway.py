@@ -56,6 +56,20 @@ def test_review_wait_stops_for_actionable_threads() -> None:
     assert not _waiting_can_help(decision)
 
 
+def test_review_wait_stops_for_draft_even_when_mergeability_is_unknown() -> None:
+    decision = Decision(
+        ready=False,
+        operation="merge",
+        blockers=["PR #5 is still a draft"],
+        details={
+            "mergeable": "UNKNOWN",
+            "unresolved_threads": 0,
+            "checks": [],
+        },
+    )
+    assert not _waiting_can_help(decision)
+
+
 def test_review_wait_continues_for_missing_or_pending_checks() -> None:
     missing = Decision(
         ready=False,

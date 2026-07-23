@@ -11,7 +11,7 @@ from typing import Any
 
 import yaml
 
-from .config import default_policy_path, find_repo_root, load_policy
+from .config import default_policy_path, find_repo_root, load_policy, validate_against_schema
 from .errors import OakPolicyError, PolicyDenied
 from .gateway import (
     merge,
@@ -208,6 +208,7 @@ def policy_main(argv: list[str] | None = None) -> None:
     try:
         policy = _load(args)
         if args.command == "validate":
+            validate_against_schema(policy)
             print(f"Policy v{policy['version']} is valid")
             if args.show:
                 print(yaml.safe_dump(policy, sort_keys=False).rstrip())
