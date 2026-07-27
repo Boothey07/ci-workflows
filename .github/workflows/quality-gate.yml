@@ -32,8 +32,9 @@ jobs:
           RESULTS: ${{ inputs.results }}
           REQUIRED_JOBS: ${{ inputs.required-jobs }}
           ALLOW_SKIPPED: ${{ inputs.allow-skipped }}
-        shell: python
+        shell: bash
         run: |
+          python3 - <<'PY'
           import json
           import os
           import sys
@@ -64,3 +65,4 @@ jobs:
                   print(f"::error::Blocking upstream results: {', '.join(failed)}")
               sys.exit(1)
           print("QUALITY GATE: PASSED")
+          PY
