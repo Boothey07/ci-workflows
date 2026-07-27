@@ -31,10 +31,6 @@ on:
         description: 'Optional comma-separated Ruff rules ignored for this consumer.'
         type: string
         default: ""
-      strict-lint:
-        description: 'Fail the job on Ruff findings. Disable while a repository pays down an existing lint baseline.'
-        type: boolean
-        default: true
       python-versions:
         description: 'JSON array of Python versions for the compile matrix.'
         type: string
@@ -85,9 +81,8 @@ permissions:
 
 jobs:
   lint:
-    name: Lint${{ inputs.strict-lint && '' || ' (advisory)' }}
+    name: Lint
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    continue-on-error: ${{ !inputs.strict-lint }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
