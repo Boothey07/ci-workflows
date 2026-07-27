@@ -21,6 +21,10 @@ on:
       working-directory:
         type: string
         default: "."
+      install-command:
+        description: 'Dependency install command.'
+        type: string
+        default: "npm ci"
 
 permissions:
   contents: read
@@ -38,9 +42,7 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
       - name: Install
-        run: |
-          # `npm ci` needs a lockfile in sync; fall back rather than fail the repo.
-          if [ -f package-lock.json ]; then npm ci || npm install; else npm install; fi
+        run: ${{ inputs.install-command }}
       - name: Lint
         run: ${{ inputs.lint-command }}
       - name: Build

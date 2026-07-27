@@ -22,6 +22,7 @@ jobs:
     with:
       paths: "."
       python-versions: '["3.11","3.12","3.13"]'
+      lint-paths: "."
       # Stay off billed minutes where a runner is registered for this repo:
       # runs-on: '["self-hosted","linux","vps"]'
       #
@@ -29,11 +30,20 @@ jobs:
       # ran nothing is worse than no job at all — it reads as coverage.
       run-tests: false
 
+  # Remove this job when the repository has no frontend package.json.
+  frontend:
+    uses: Boothey07/ci-workflows/.github/workflows/node-ci.yml@v2
+    with:
+      install-command: "npm ci"
+      lint-command: "npm run lint --if-present"
+      build-command: "npm run build --if-present"
+      test-command: "npm test --if-present"
+
   quality-gate:
     name: Quality Gate
     if: always()
-    needs: [hygiene, secrets, python]
+    needs: [hygiene, secrets, python, frontend]
     uses: Boothey07/ci-workflows/.github/workflows/quality-gate.yml@v2
     with:
       results: ${{ toJSON(needs) }}
-      required-jobs: hygiene,secrets,python
+      required-jobs: hygiene,secrets,python,frontend
