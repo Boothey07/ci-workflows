@@ -20,6 +20,7 @@ def test_detects_python_node_and_tests_in_nested_paths():
 def test_rendered_ci_has_only_detected_required_jobs():
     workflow = render_ci(RepoProfile("python", True, False, False), '["ubuntu-latest"]')
 
+    assert "jobs:\n" in workflow
     assert "python-ci.yml@v2" in workflow
     assert "node-ci.yml@v2" not in workflow
     assert "required-jobs: hygiene,secrets,python" in workflow
