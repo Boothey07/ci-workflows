@@ -6,9 +6,9 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 from scripts.bootstrap_repo import (  # noqa: E402
     RepoProfile,
     detect_profile,
+    render_auto_merge,
     render_ci,
     render_post_merge,
-    render_auto_merge,
 )
 
 
