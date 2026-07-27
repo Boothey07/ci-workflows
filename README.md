@@ -77,6 +77,7 @@ failure behaviour, bypass boundaries, and rollout.
 | `pr-hygiene.yml` | branch naming, Conventional-Commit PR title, verified linked issue |
 | `secrets.yml` | gitleaks (GitHub's own scanning is public-only without GHAS) |
 | `quality-gate.yml` | collapses named upstream jobs into one required result |
+| `auto-merge.yml` | guarded owner-only squash merge after current-commit checks pass |
 | `guard.yml` | files an issue on a direct push to `main` or `dev` — detection, not prevention |
 
 | Component | Purpose |
@@ -113,6 +114,23 @@ quality-gate:
 
 Pin a tag rather than moving `main`; one bad central edit must not break every
 consumer at once.
+
+## Opt-in automatic merging
+
+The bootstrap tool can install an opt-in auto-merge caller:
+
+```bash
+python scripts/bootstrap_repo.py Boothey07/example \
+  --runner self-hosted \
+  --runner-labels self-hosted,linux,x64,vps,example \
+  --auto-merge --force
+```
+
+The workflow only acts on a non-draft, owner-authored pull request with the
+explicit `automerge` label, and only after every check for the current head
+commit is successful, skipped, or neutral. It squash-merges and deletes the
+source branch. The label is the human approval switch; do not apply it to
+untrusted or experimental changes.
 
 ## Runners
 

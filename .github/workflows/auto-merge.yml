@@ -1,0 +1,62 @@
+name: Auto-merge (reusable)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  merge:
+    name: Auto-merge
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.pull_request.draft == false &&
+      contains(github.event.pull_request.labels.*.name, 'automerge'))
+    steps:
+      - name: Validate merge policy
+        id: policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          OWNER: ${{ github.repository_owner }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pr=$(gh pr view "$PR" --repo "$REPO" --json author,isDraft,headRefOid,labels)
+          author=$(printf '%s' "$pr" | jq -r '.author.login')
+          draft=$(printf '%s' "$pr" | jq -r '.isDraft')
+          head=$(printf '%s' "$pr" | jq -r '.headRefOid')
+          labeled=$(printf '%s' "$pr" | jq -r '[.labels[].name] | index("automerge") != null')
+
+          [ "$author" = "$OWNER" ] || { echo "only owner-authored PRs may auto-merge"; exit 1; }
+          [ "$draft" = "false" ] || { echo "draft PRs cannot auto-merge"; exit 1; }
+          [ "$head" = "$SHA" ] || { echo "PR head changed during validation"; exit 1; }
+          [ "$labeled" = "true" ] || { echo "missing automerge label"; exit 1; }
+
+          checks=$(gh api --paginate "repos/$REPO/commits/$SHA/check-runs" \
+            --jq '.check_runs[] | [.name, .status, (.conclusion // "")] | @tsv')
+          [ -n "$checks" ] || { echo "no checks reported for $SHA"; exit 1; }
+          bad=0
+          while IFS=$'\t' read -r name status conclusion; do
+            [[ "$name" == "Auto-merge"* ]] && continue
+            printf '%s: %s/%s\n' "$name" "$status" "$conclusion"
+            if [ "$status" != "completed" ] || [[ ! "$conclusion" =~ ^(success|skipped|neutral)$ ]]; then
+              bad=1
+            fi
+          done <<< "$checks"
+          [ "$bad" -eq 0 ] || { echo "not all checks passed for the current commit"; exit 1; }
+
+          echo "validated=true" >> "$GITHUB_OUTPUT"
+
+      - name: Squash merge
+        if: steps.policy.outputs.validated == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh pr merge "$PR" --repo "$REPO" --squash --delete-branch
