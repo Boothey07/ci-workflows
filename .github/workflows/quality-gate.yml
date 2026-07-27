@@ -60,6 +60,24 @@ jobs:
               if result not in allowed:
                   failed.append(f"{job}={result}")
 
+          summary_lines = ["## Quality Gate", ""]
+          if failed:
+              summary_lines.extend([
+                  "The workflow is blocked by these upstream results:",
+                  "",
+                  *[f"- `{item}`" for item in failed],
+              ])
+          elif missing:
+              summary_lines.extend([
+                  "Required jobs did not report:",
+                  "",
+                  *[f"- `{item}`" for item in missing],
+              ])
+          else:
+              summary_lines.append("All required jobs passed.")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write("\\n".join(summary_lines) + "\\n")
+
           if missing or failed:
               if failed:
                   print(f"::error::Blocking upstream results: {', '.join(failed)}")
