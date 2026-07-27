@@ -3,7 +3,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
-from scripts.bootstrap_repo import RepoProfile, detect_profile, render_ci, render_post_merge  # noqa: E402
+from scripts.bootstrap_repo import (  # noqa: E402
+    RepoProfile,
+    detect_profile,
+    render_ci,
+    render_post_merge,
+)
 
 
 def test_detects_python_node_and_tests_in_nested_paths():
