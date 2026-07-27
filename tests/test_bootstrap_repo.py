@@ -37,7 +37,9 @@ def test_post_merge_removes_pr_only_hygiene():
 
 
 def test_master_repositories_use_master_branch_filters():
-    workflow = render_post_merge(RepoProfile("generic", False, False, False), '["ubuntu-latest"]', "master")
+    workflow = render_post_merge(
+        RepoProfile("generic", False, False, False), '["ubuntu-latest"]', "master"
+    )
 
     assert "branches: [master]" in workflow
     assert "branches: [main, dev]" not in workflow
