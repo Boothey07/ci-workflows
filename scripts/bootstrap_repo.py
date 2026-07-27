@@ -107,7 +107,7 @@ def render_ci(profile: RepoProfile, runs_on: str) -> str:
         "# Managed by Boothey07/ci-workflows. Edit the profile inputs, not the reusable jobs.\n"
         "name: CI\n\n"
         "on:\n  pull_request:\n    branches: [main, dev]\n\n"
-        "permissions:\n  contents: read\n\n"
+        "permissions:\n  contents: read\n  issues: read\n  pull-requests: read\n\n"
         "jobs:\n"
         + "\n".join(jobs)
     )
