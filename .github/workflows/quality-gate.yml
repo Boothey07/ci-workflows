@@ -32,7 +32,7 @@ jobs:
           RESULTS: ${{ inputs.results }}
           REQUIRED_JOBS: ${{ inputs.required-jobs }}
           ALLOW_SKIPPED: ${{ inputs.allow-skipped }}
-        shell: python
+        shell: python3
         run: |
           import json
           import os
