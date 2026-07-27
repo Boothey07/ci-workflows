@@ -55,7 +55,7 @@ def runner_json(mode: str, labels: str) -> str:
     return json.dumps(values, separators=(",", ":"))
 
 
-def render_ci(profile: RepoProfile, runs_on: str) -> str:
+def render_ci(profile: RepoProfile, runs_on: str, default_branch: str = "main") -> str:
     jobs: list[str] = []
     required: list[str] = ["hygiene", "secrets"]
     jobs.extend(
@@ -103,20 +103,25 @@ def render_ci(profile: RepoProfile, runs_on: str) -> str:
         f"      required-jobs: {','.join(required)}\n"
         f"      runs-on: '{runs_on}'\n"
     )
+    branches = "[master]" if default_branch == "master" else "[main, dev]"
     return (
         "# Managed by Boothey07/ci-workflows. Edit the profile inputs, not the reusable jobs.\n"
         "name: CI\n\n"
-        "on:\n  pull_request:\n    branches: [main, dev]\n\n"
+        f"on:\n  pull_request:\n    branches: {branches}\n\n"
         "permissions:\n  contents: read\n  issues: read\n  pull-requests: read\n\n"
         "jobs:\n"
         + "\n".join(jobs)
     )
 
 
-def render_post_merge(profile: RepoProfile, runs_on: str) -> str:
-    ci = render_ci(profile, runs_on)
+def render_post_merge(profile: RepoProfile, runs_on: str, default_branch: str = "main") -> str:
+    ci = render_ci(profile, runs_on, default_branch)
     body = ci.replace("name: CI", "name: Post-merge CI", 1)
-    body = body.replace("  pull_request:\n    branches: [main, dev]", "  push:\n    branches: [main, dev]\n  workflow_dispatch:")
+    branches = "[master]" if default_branch == "master" else "[main, dev]"
+    body = body.replace(
+        f"  pull_request:\n    branches: {branches}",
+        f"  push:\n    branches: {branches}\n  workflow_dispatch:",
+    )
     hygiene_start = body.index("  hygiene:\n")
     hygiene_end = body.index("\n\n  secrets:", hygiene_start)
     body = body[:hygiene_start] + body[hygiene_end + 2 :]
@@ -220,7 +225,10 @@ def main() -> int:
         branch = repo_data["default_branch"]
     profile = detect_profile(github.root_files(args.repo, branch))
     runs_on = runner_json(args.runner, args.runner_labels)
-    files = {".github/workflows/ci.yml": render_ci(profile, runs_on), ".github/workflows/post-merge.yml": render_post_merge(profile, runs_on)}
+    files = {
+        ".github/workflows/ci.yml": render_ci(profile, runs_on, branch),
+        ".github/workflows/post-merge.yml": render_post_merge(profile, runs_on, branch),
+    }
     print(f"{args.repo}: profile={profile.name} branch={branch} runner={args.runner}")
     if args.dry_run:
         print("dry-run: would write " + ", ".join(files))
