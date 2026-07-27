@@ -108,6 +108,7 @@ def render_ci(profile: RepoProfile, runs_on: str) -> str:
         "name: CI\n\n"
         "on:\n  pull_request:\n    branches: [main, dev]\n\n"
         "permissions:\n  contents: read\n\n"
+        "jobs:\n"
         + "\n".join(jobs)
     )
 
