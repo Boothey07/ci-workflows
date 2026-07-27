@@ -15,6 +15,10 @@ on:
         description: 'Pipe-separated allowed branch/commit types.'
         type: string
         default: "feat|fix|chore|docs|refactor|test|perf|ci|deps|hotfix"
+      runs-on:
+        description: 'JSON runner label array, e.g. ["self-hosted","linux","x64","vps"].'
+        type: string
+        default: '["ubuntu-latest"]'
 
 permissions:
   contents: read
@@ -24,7 +28,7 @@ permissions:
 jobs:
   hygiene:
     name: PR hygiene
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
     steps:
       - name: Branch name
         env:
