@@ -1,4 +1,9 @@
-from scripts.bootstrap_repo import RepoProfile, detect_profile, render_ci, render_post_merge
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parents[1]))
+
+from scripts.bootstrap_repo import RepoProfile, detect_profile, render_ci, render_post_merge  # noqa: E402
 
 
 def test_detects_python_node_and_tests_in_nested_paths():
