@@ -116,7 +116,8 @@ def render_post_merge(profile: RepoProfile, runs_on: str) -> str:
     ci = render_ci(profile, runs_on)
     body = ci.replace("name: CI", "name: Post-merge CI", 1)
     body = body.replace("  pull_request:\n    branches: [main, dev]", "  push:\n    branches: [main, dev]\n  workflow_dispatch:")
-    body = body.replace("\n  hygiene:\n", "\n")
+    hygiene_block = next(block for block in body.split("\n\n") if block.startswith("  hygiene:\n"))
+    body = body.replace(f"\n\n{hygiene_block}", "")
     body = body.replace("needs: [hygiene, ", "needs: [")
     body = body.replace("required-jobs: hygiene,", "required-jobs: ")
     return body
