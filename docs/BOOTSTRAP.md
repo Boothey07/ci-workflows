@@ -6,6 +6,7 @@ detects a simple project profile, and writes:
 
 - `.github/workflows/ci.yml` for pull requests;
 - `.github/workflows/post-merge.yml` for pushes to `main` or `dev`.
+- optionally `.github/workflows/auto-merge.yml` for guarded owner-only merges.
 
 The tool is dependency-free and defaults to GitHub-hosted runners. A private
 repository can opt into the VPS runner with:
@@ -18,6 +19,11 @@ GH_TOKEN=... python scripts/bootstrap_repo.py Boothey07/example \
 
 Use `--dry-run` to inspect profile detection. Existing caller workflows are
 left untouched unless `--force` is supplied.
+
+Automatic merging is deliberately opt-in. Pass `--auto-merge` only after the
+repository has the desired CI checks. A PR must be non-draft, owner-authored,
+labelled `automerge`, and green for its current commit before it is squash
+merged.
 
 ## Personal-account automation
 

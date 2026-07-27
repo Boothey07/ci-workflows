@@ -8,6 +8,7 @@ from scripts.bootstrap_repo import (  # noqa: E402
     detect_profile,
     render_ci,
     render_post_merge,
+    render_auto_merge,
 )
 
 
@@ -43,3 +44,12 @@ def test_master_repositories_use_master_branch_filters():
 
     assert "branches: [master]" in workflow
     assert "branches: [main, dev]" not in workflow
+
+
+def test_auto_merge_is_opt_in_and_uses_default_branch():
+    workflow = render_auto_merge("master")
+
+    assert "pull_request_target:" in workflow
+    assert "branches: [master]" in workflow
+    assert "types: [opened, synchronize, reopened, ready_for_review, labeled]" in workflow
+    assert "auto-merge.yml@v2" in workflow

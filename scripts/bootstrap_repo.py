@@ -130,6 +130,27 @@ def render_post_merge(profile: RepoProfile, runs_on: str, default_branch: str = 
     return body
 
 
+def render_auto_merge(default_branch: str = "main") -> str:
+    branches = "[master]" if default_branch == "master" else "[main, dev]"
+    return (
+        "# Managed by Boothey07/ci-workflows.\n"
+        "# This workflow is opt-in: apply the 'automerge' label to a trusted PR.\n"
+        "name: Auto-merge\n\n"
+        "on:\n"
+        "  pull_request_target:\n"
+        f"    branches: {branches}\n"
+        "    types: [opened, synchronize, reopened, ready_for_review, labeled]\n\n"
+        "permissions:\n"
+        "  contents: write\n"
+        "  pull-requests: write\n"
+        "  checks: read\n\n"
+        "jobs:\n"
+        "  auto-merge:\n"
+        "    uses: Boothey07/ci-workflows/.github/workflows/auto-merge.yml@v2\n"
+        "    secrets: inherit\n"
+    )
+
+
 class GitHub:
     def __init__(self, token: str):
         self.token = token
@@ -213,6 +234,11 @@ def main() -> int:
     parser.add_argument("--runner", choices=("hosted", "self-hosted"), default="hosted")
     parser.add_argument("--runner-labels", default="self-hosted,linux,x64,vps", help="comma-separated labels")
     parser.add_argument("--force", action="store_true", help="replace existing caller workflows")
+    parser.add_argument(
+        "--auto-merge",
+        action="store_true",
+        help="also install the opt-in owner-only auto-merge workflow",
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     token = auth_token()
@@ -229,6 +255,8 @@ def main() -> int:
         ".github/workflows/ci.yml": render_ci(profile, runs_on, branch),
         ".github/workflows/post-merge.yml": render_post_merge(profile, runs_on, branch),
     }
+    if args.auto_merge:
+        files[".github/workflows/auto-merge.yml"] = render_auto_merge(branch)
     print(f"{args.repo}: profile={profile.name} branch={branch} runner={args.runner}")
     if args.dry_run:
         print("dry-run: would write " + ", ".join(files))
