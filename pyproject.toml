@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oak-policy"
+version = "0.1.0"
+description = "Harness-agnostic Git and GitHub policy gateway for agent-driven development"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+  "jsonschema>=4.23,<5",
+  "PyYAML>=6.0,<7",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0,<9",
+  "ruff>=0.8,<1",
+]
+
+[project.scripts]
+oak-agent = "oak_policy.launcher:main"
+oak-git = "oak_policy.cli:git_main"
+oak-policy = "oak_policy.cli:policy_main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.data-files]
+"share/oak-policy/policy" = [
+  "policy/default.yaml",
+  "policy/schema.json",
+]
+"share/oak-policy/adapters" = [
+  "adapters/claude-code.json",
+  "adapters/codex.json",
+  "adapters/opencode.json",
+  "adapters/reasonix.json",
+  "adapters/zcode.json",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

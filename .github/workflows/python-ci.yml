@@ -11,6 +11,26 @@ on:
         description: 'Space-separated paths to lint/compile (e.g. "api/ tools/"). Defaults to the repo root.'
         type: string
         default: "."
+      working-directory:
+        description: 'Directory containing the Python project.'
+        type: string
+        default: "."
+      lint-paths:
+        description: 'Paths passed to ruff. Defaults to paths.'
+        type: string
+        default: ""
+      ruff-select:
+        description: 'Optional comma-separated Ruff rule selection for a staged baseline.'
+        type: string
+        default: ""
+      ruff-extend-select:
+        description: 'Optional comma-separated Ruff rules added to the project configuration.'
+        type: string
+        default: ""
+      ruff-ignore:
+        description: 'Optional comma-separated Ruff rules ignored for this consumer.'
+        type: string
+        default: ""
       python-versions:
         description: 'JSON array of Python versions for the compile matrix.'
         type: string
@@ -39,6 +59,10 @@ on:
         description: 'Fail under this coverage %. 0 disables.'
         type: number
         default: 0
+      coverage-source:
+        description: 'Source package passed to pytest-cov.'
+        type: string
+        default: ""
       strict-types:
         description: 'Make mypy blocking. Off by default: a wall of red on untyped code trains you to ignore CI.'
         type: boolean
@@ -66,7 +90,18 @@ jobs:
           python-version: "3.12"
       - run: pip install "ruff==${{ inputs.ruff-version }}"
       - name: ruff check
-        run: ruff check --output-format=github ${{ inputs.paths }}
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          LINT_PATHS: ${{ inputs.lint-paths || inputs.paths }}
+          RUFF_SELECT: ${{ inputs.ruff-select }}
+          RUFF_EXTEND_SELECT: ${{ inputs.ruff-extend-select }}
+          RUFF_IGNORE: ${{ inputs.ruff-ignore }}
+        run: |
+          args=(--output-format=github)
+          [ -n "$RUFF_SELECT" ] && args+=(--select "$RUFF_SELECT")
+          [ -n "$RUFF_EXTEND_SELECT" ] && args+=(--extend-select "$RUFF_EXTEND_SELECT")
+          [ -n "$RUFF_IGNORE" ] && args+=(--ignore "$RUFF_IGNORE")
+          ruff check "${args[@]}" $LINT_PATHS
 
   format:
     name: Format${{ inputs.strict-format && '' || ' (advisory)' }}
@@ -79,6 +114,7 @@ jobs:
           python-version: "3.12"
       - run: pip install "ruff==${{ inputs.ruff-version }}"
       - name: ruff format --check
+        working-directory: ${{ inputs.working-directory }}
         run: |
           if ruff format --check --diff ${{ inputs.paths }}; then
             exit 0
@@ -103,6 +139,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Byte-compile every module
+        working-directory: ${{ inputs.working-directory }}
         run: python -m compileall -q ${{ inputs.paths }}
 
   test:
@@ -115,6 +152,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
+        working-directory: ${{ inputs.working-directory }}
         run: |
           if [ -n "${{ inputs.install-command }}" ]; then
             ${{ inputs.install-command }}
@@ -122,10 +160,12 @@ jobs:
             pip install pytest pytest-cov
           fi
       - name: Run tests
+        working-directory: ${{ inputs.working-directory }}
         run: |
           if [ "${{ inputs.coverage-threshold }}" != "0" ]; then
-            ${{ inputs.test-command }} --cov --cov-report=term-missing \
-              --cov-fail-under=${{ inputs.coverage-threshold }}
+            coverage_args=(--cov-report=term-missing --cov-fail-under=${{ inputs.coverage-threshold }})
+            [ -n "${{ inputs.coverage-source }}" ] && coverage_args+=(--cov="${{ inputs.coverage-source }}")
+            ${{ inputs.test-command }} "${coverage_args[@]}"
           else
             ${{ inputs.test-command }}
           fi
@@ -141,7 +181,15 @@ jobs:
           python-version: "3.12"
       - run: pip install mypy
       - name: mypy
-        run: mypy --ignore-missing-imports --no-error-summary ${{ inputs.paths }} || ${{ inputs.strict-types && 'exit 1' || 'echo "advisory only — not blocking"' }}
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          if mypy --ignore-missing-imports --no-error-summary ${{ inputs.paths }}; then
+            exit 0
+          fi
+          if [ "${{ inputs.strict-types }}" = "true" ]; then
+            exit 1
+          fi
+          echo "advisory only — not blocking"
 
   audit:
     name: Dependency audit (advisory)
@@ -154,6 +202,7 @@ jobs:
           python-version: "3.12"
       - run: pip install pip-audit
       - name: pip-audit
+        working-directory: ${{ inputs.working-directory }}
         run: |
           shopt -s nullglob
           reqs=(requirements*.txt)

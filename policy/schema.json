@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Boothey07/ci-workflows/policy/schema.json",
+  "title": "Oak Policy",
+  "type": "object",
+  "required": [
+    "version",
+    "repository",
+    "branches",
+    "pull_requests",
+    "checks",
+    "reviews",
+    "merge",
+    "agents"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "repository": {
+      "type": "object",
+      "required": ["remote", "protected_branches"],
+      "properties": {
+        "remote": { "type": "string", "minLength": 1 },
+        "protected_branches": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "branches": {
+      "type": "object",
+      "required": ["types", "require_issue", "slug_pattern", "bot_patterns"],
+      "properties": {
+        "types": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
+        },
+        "require_issue": { "type": "boolean" },
+        "slug_pattern": { "type": "string", "minLength": 1 },
+        "bot_patterns": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "pull_requests": {
+      "type": "object",
+      "required": [
+        "require_pull_request",
+        "deny_drafts",
+        "require_current_head_sha",
+        "require_mergeable",
+        "require_up_to_date",
+        "target_rules"
+      ],
+      "properties": {
+        "require_pull_request": { "type": "boolean" },
+        "deny_drafts": { "type": "boolean" },
+        "require_current_head_sha": { "type": "boolean" },
+        "require_mergeable": { "type": "boolean" },
+        "require_up_to_date": { "type": "boolean" },
+        "target_rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["source", "targets"],
+            "properties": {
+              "source": { "type": "string", "minLength": 1 },
+              "targets": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "checks": {
+      "type": "object",
+      "required": [
+        "required",
+        "success_conclusions",
+        "block_any_pending",
+        "block_any_failure"
+      ],
+      "properties": {
+        "required": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "success_conclusions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "block_any_pending": { "type": "boolean" },
+        "block_any_failure": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "reviews": {
+      "type": "object",
+      "required": ["require_no_unresolved_threads", "coderabbit"],
+      "properties": {
+        "require_no_unresolved_threads": { "type": "boolean" },
+        "coderabbit": {
+          "type": "object",
+          "required": ["required", "check_patterns"],
+          "properties": {
+            "required": { "type": "boolean" },
+            "check_patterns": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "merge": {
+      "type": "object",
+      "required": ["method", "delete_branch", "deny_admin_bypass"],
+      "properties": {
+        "method": { "enum": ["merge", "rebase", "squash"] },
+        "delete_branch": { "type": "boolean" },
+        "deny_admin_bypass": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "agents": {
+      "type": "object",
+      "required": ["harnesses"],
+      "properties": {
+        "harnesses": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "required": ["adapter", "command"],
+            "properties": {
+              "adapter": { "type": "string", "minLength": 1 },
+              "command": { "type": "string", "minLength": 1 },
+              "instruction_file": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
