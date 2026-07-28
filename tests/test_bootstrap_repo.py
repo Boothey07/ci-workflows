@@ -51,10 +51,12 @@ def test_auto_merge_is_opt_in_and_uses_default_branch():
     workflow = render_auto_merge("master", '["self-hosted","linux","x64","vps","example"]')
 
     assert "pull_request_target:" in workflow
+    assert "workflow_run:" in workflow
     assert "branches: [master]" in workflow
     assert "types: [opened, synchronize, reopened, ready_for_review, labeled]" in workflow
-    assert "auto-merge.yml@v3" in workflow
-    assert 'runs-on: \'["self-hosted","linux","x64","vps","example"]\'' in workflow
+    assert "auto-merge.yml@v8" in workflow
+    assert "runs-on: ubuntu-latest" in workflow
+    assert "reviewer_app_private_key: ${{ secrets.REVIEWER_APP_PRIVATE_KEY }}" in workflow
 
 
 def test_pr_review_uses_local_model_and_runner():
@@ -63,8 +65,10 @@ def test_pr_review_uses_local_model_and_runner():
     assert "pull_request_target:" in workflow
     assert "branches: [master]" in workflow
     assert "types: [opened, reopened, synchronize, ready_for_review, review_requested]" in workflow
-    assert "ci-pr-reviewer/.github/workflows/pr-review.yml@v3" in workflow
+    assert "ci-pr-reviewer/.github/workflows/pr-review.yml@v5" in workflow
     assert "openai/pr-review-minimax" in workflow
     assert 'runs-on: \'["self-hosted","linux","x64","vps","ci"]\'' in workflow
     assert "mark-ready: true" in workflow
-    assert "secrets: inherit" in workflow
+    assert "auto-merge: true" in workflow
+    assert "auto-fix: true" in workflow
+    assert "reviewer_app_private_key: ${{ secrets.REVIEWER_APP_PRIVATE_KEY }}" in workflow

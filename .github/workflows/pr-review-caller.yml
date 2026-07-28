@@ -10,14 +10,18 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
   issues: write
 
 jobs:
   review:
-      uses: Boothey07/ci-pr-reviewer/.github/workflows/pr-review.yml@v3
+    uses: Boothey07/ci-pr-reviewer/.github/workflows/pr-review.yml@v5
     with:
       runs-on: '["self-hosted","linux","x64","vps","ci"]'
       mark-ready: true
-    secrets: inherit
+      auto-merge: true
+      auto-fix: true
+    secrets:
+      reviewer_app_id: ${{ secrets.REVIEWER_APP_ID }}
+      reviewer_app_private_key: ${{ secrets.REVIEWER_APP_PRIVATE_KEY }}

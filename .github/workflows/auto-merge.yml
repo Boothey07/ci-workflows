@@ -3,10 +3,22 @@ name: Auto-merge (reusable)
 on:
   workflow_call:
     inputs:
+      pr-number:
+        description: "Pull request number"
+        type: number
+        required: true
+      head-sha:
+        description: "Expected pull request head SHA"
+        type: string
+        required: true
       runs-on:
         description: "Runner label"
         type: string
-        default: 'self-hosted'
+        default: "ubuntu-latest"
+      required-check:
+        description: "Single aggregate check that must pass before merge"
+        type: string
+        default: "Quality Gate / Quality Gate"
     secrets:
       reviewer_app_id:
         required: false
@@ -22,9 +34,6 @@ jobs:
   merge:
     name: Auto-merge
     runs-on: ${{ inputs.runs-on }}
-    if: >-
-      github.event.pull_request.draft == false &&
-      contains(github.event.pull_request.labels.*.name, 'automerge')
     steps:
       - name: Create reviewer App token
         id: reviewer-app-token
@@ -42,37 +51,48 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.reviewer-app-token.outputs.token || github.token }}
           REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
+          PR: ${{ inputs.pr-number }}
           OWNER: ${{ github.repository_owner }}
-          SHA: ${{ github.event.pull_request.head.sha }}
+          SHA: ${{ inputs.head-sha }}
+          REQUIRED_CHECK: ${{ inputs.required-check }}
         shell: bash
         run: |
           set -euo pipefail
-          pr=$(gh pr view "$PR" --repo "$REPO" --json author,isDraft,headRefOid,labels)
-          author=$(printf '%s' "$pr" | jq -r '.author.login')
-          draft=$(printf '%s' "$pr" | jq -r '.isDraft')
-          head=$(printf '%s' "$pr" | jq -r '.headRefOid')
-          labeled=$(printf '%s' "$pr" | jq -r '[.labels[].name] | index("automerge") != null')
+          pr=$(gh api "repos/$REPO/pulls/$PR")
+          author=$(jq -r '.user.login' <<< "$pr")
+          draft=$(jq -r '.draft' <<< "$pr")
+          head=$(jq -r '.head.sha' <<< "$pr")
+          state=$(jq -r '.state' <<< "$pr")
+          labels=$(jq -r '[.labels[].name] | join(",")' <<< "$pr")
 
-          [ "$author" = "$OWNER" ] || { echo "only owner-authored PRs may auto-merge"; exit 1; }
-          [ "$draft" = "false" ] || { echo "draft PRs cannot auto-merge"; exit 1; }
-          [ "$head" = "$SHA" ] || { echo "PR head changed during validation"; exit 1; }
-          [ "$labeled" = "true" ] || { echo "missing automerge label"; exit 1; }
+          if [ "$state" != "open" ] || [ "$author" != "$OWNER" ] || [ "$draft" != "false" ] || [ "$head" != "$SHA" ]; then
+            echo "merge gate inactive: state=$state author=$author draft=$draft head=$head"
+            exit 0
+          fi
+          if ! jq -e '[.labels[].name] | contains(["automerge", "reviewer-ready"])' <<< "$pr" >/dev/null; then
+            echo "merge gate waiting for reviewer labels: $labels"
+            exit 0
+          fi
 
-          checks=$(gh api --paginate "repos/$REPO/commits/$SHA/check-runs" \
-            --jq '.check_runs[] | [.name, .status, (.conclusion // "")] | @tsv')
-          [ -n "$checks" ] || { echo "no checks reported for $SHA"; exit 1; }
-          bad=0
-          while IFS=$'\t' read -r name status conclusion; do
-            # GitHub prefixes reusable-workflow checks with the caller job name,
-            # so the check can appear as "auto-merge / Auto-merge".
-            [[ "${name,,}" == *"auto-merge"* ]] && continue
-            printf '%s: %s/%s\n' "$name" "$status" "$conclusion"
-            if [ "$status" != "completed" ] || [[ ! "$conclusion" =~ ^(success|skipped|neutral)$ ]]; then
-              bad=1
-            fi
-          done <<< "$checks"
-          [ "$bad" -eq 0 ] || { echo "not all checks passed for the current commit"; exit 1; }
+          reviews=$(gh api --paginate "repos/$REPO/pulls/$PR/reviews" --slurp)
+          approved=$(jq -r --arg sha "$SHA" \
+            'flatten | any(.state == "APPROVED" and .commit_id == $sha and (.user.login | startswith("ci-review-bot")))' \
+            <<< "$reviews")
+          if [ "$approved" != "true" ]; then
+            echo "merge gate waiting for a current ci-review-bot approval"
+            exit 0
+          fi
+
+          checks=$(gh api --paginate "repos/$REPO/commits/$SHA/check-runs" --slurp)
+          check=$(jq -c --arg required "$REQUIRED_CHECK" \
+            'flatten | map(.check_runs[]) | map(select(.name == $required)) | last // {}' \
+            <<< "$checks")
+          status=$(jq -r '.status // "missing"' <<< "$check")
+          conclusion=$(jq -r '.conclusion // ""' <<< "$check")
+          if [ "$status" != "completed" ] || [ "$conclusion" != "success" ]; then
+            echo "merge gate waiting for $REQUIRED_CHECK: $status/$conclusion"
+            exit 0
+          fi
 
           echo "validated=true" >> "$GITHUB_OUTPUT"
 
@@ -81,5 +101,6 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.reviewer-app-token.outputs.token || github.token }}
           REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
-        run: gh pr merge "$PR" --repo "$REPO" --squash --delete-branch
+          PR: ${{ inputs.pr-number }}
+          SHA: ${{ inputs.head-sha }}
+        run: gh pr merge "$PR" --repo "$REPO" --squash --delete-branch --match-head-commit "$SHA"
