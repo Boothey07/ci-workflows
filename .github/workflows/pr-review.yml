@@ -19,6 +19,10 @@ on:
         description: "Pinned PR-Agent package version"
         type: string
         default: "0.39.0"
+      mark-ready:
+        description: "Mark a draft PR ready after a successful review"
+        type: boolean
+        default: true
     secrets:
       llm-api-key:
         required: false
@@ -71,3 +75,20 @@ jobs:
             "config.model=$CONFIG_MODEL" \
             "OLLAMA.API_BASE=$OLLAMA_API_BASE" \
             pr-agent --pr_url "$PR_URL" review
+
+      - name: Mark reviewed PR ready
+        if: inputs.mark-ready && github.event.pull_request.draft == true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            -X PATCH \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
+            -d '{"draft":false}' >/dev/null

@@ -149,7 +149,8 @@ The reusable workflow pins PR-Agent and defaults to Ollama's
 model available locally. An API key can be passed through the optional
 `llm-api-key` secret when a repository needs a fallback model. Reviews run under
 `pull_request_target` with read-only code access and write access limited to PR
-comments/issues.
+comments/issues. A successful review automatically converts a draft PR to ready
+for review; the separate `automerge` label remains required before merging.
 
 ## Runners
 

@@ -165,7 +165,7 @@ def render_pr_review(
         "on:\n"
         "  pull_request_target:\n"
         f"    branches: {branches}\n"
-        "    types: [opened, reopened, synchronize, ready_for_review, review_requested]\n\n"
+        "    types: [opened, reopened, synchronize, review_requested]\n\n"
         "permissions:\n"
         "  contents: read\n"
         "  pull-requests: write\n"
@@ -177,6 +177,7 @@ def render_pr_review(
         f"      runs-on: '{runs_on}'\n"
         f"      model: '{model}'\n"
         f"      api-base: '{api_base}'\n"
+        "      mark-ready: true\n"
         "    secrets: inherit\n"
     )
 
