@@ -1,0 +1,77 @@
+name: CI auto-merge
+description: Validate a pull request and squash-merge it as the reviewer GitHub App
+inputs:
+  app-id:
+    description: GitHub App ID used as the merge actor
+    required: true
+  private-key:
+    description: GitHub App private key
+    required: true
+  owner:
+    description: Repository owner
+    required: true
+  repository:
+    description: Repository name
+    required: true
+  pull-request:
+    description: Pull request number
+    required: true
+  head-sha:
+    description: Expected pull request head SHA
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Create reviewer App token
+      id: reviewer-app-token
+      uses: actions/create-github-app-token@v3
+      with:
+        app-id: ${{ inputs.app-id }}
+        private-key: ${{ inputs.private-key }}
+        owner: ${{ inputs.owner }}
+        permission-contents: write
+        permission-pull-requests: write
+        permission-checks: read
+
+    - name: Validate merge policy
+      id: policy
+      shell: bash
+      env:
+        GH_TOKEN: ${{ steps.reviewer-app-token.outputs.token }}
+        REPO: ${{ inputs.repository }}
+        PR: ${{ inputs.pull-request }}
+        OWNER: ${{ inputs.owner }}
+        SHA: ${{ inputs.head-sha }}
+      run: |
+        set -euo pipefail
+        pr=$(gh pr view "$PR" --repo "$REPO" --json author,isDraft,headRefOid,labels)
+        author=$(printf '%s' "$pr" | jq -r '.author.login')
+        draft=$(printf '%s' "$pr" | jq -r '.isDraft')
+        head=$(printf '%s' "$pr" | jq -r '.headRefOid')
+        labeled=$(printf '%s' "$pr" | jq -r '[.labels[].name] | index("automerge") != null')
+
+        [ "$author" = "$OWNER" ] || { echo "only owner-authored PRs may auto-merge"; exit 1; }
+        [ "$draft" = "false" ] || { echo "draft PRs cannot auto-merge"; exit 1; }
+        [ "$head" = "$SHA" ] || { echo "PR head changed during validation"; exit 1; }
+        [ "$labeled" = "true" ] || { echo "missing automerge label"; exit 1; }
+
+        checks=$(gh api --paginate "repos/$REPO/commits/$SHA/check-runs" \
+          --jq '.check_runs[] | [.name, .status, (.conclusion // "")] | @tsv')
+        [ -n "$checks" ] || { echo "no checks reported for $SHA"; exit 1; }
+        bad=0
+        while IFS=$'\t' read -r name status conclusion; do
+          [[ "$name" == "Auto-merge"* ]] && continue
+          printf '%s: %s/%s\n' "$name" "$status" "$conclusion"
+          if [ "$status" != "completed" ] || [[ ! "$conclusion" =~ ^(success|skipped|neutral)$ ]]; then
+            bad=1
+          fi
+        done <<< "$checks"
+        [ "$bad" -eq 0 ] || { echo "not all checks passed for the current commit"; exit 1; }
+
+    - name: Squash merge
+      shell: bash
+      env:
+        GH_TOKEN: ${{ steps.reviewer-app-token.outputs.token }}
+        REPO: ${{ inputs.repository }}
+        PR: ${{ inputs.pull-request }}
+      run: gh pr merge "$PR" --repo "$REPO" --squash --delete-branch
