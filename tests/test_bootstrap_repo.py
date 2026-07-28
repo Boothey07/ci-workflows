@@ -65,3 +65,4 @@ def test_pr_review_uses_local_model_and_runner():
     assert "pr-review.yml@v2" in workflow
     assert "ollama/qwen2.5-coder:7b" in workflow
     assert 'runs-on: \'["self-hosted","linux","x64","vps","ci"]\'' in workflow
+    assert "secrets: inherit" in workflow
