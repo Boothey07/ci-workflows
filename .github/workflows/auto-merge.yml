@@ -7,6 +7,11 @@ on:
         description: "JSON runner label array"
         type: string
         default: '["ubuntu-latest"]'
+    secrets:
+      reviewer_app_id:
+        required: false
+      reviewer_app_private_key:
+        required: false
 
 permissions:
   contents: write
@@ -21,10 +26,22 @@ jobs:
       github.event.pull_request.draft == false &&
       contains(github.event.pull_request.labels.*.name, 'automerge')
     steps:
+      - name: Create reviewer App token
+        id: reviewer-app-token
+        if: ${{ secrets.reviewer_app_id != '' && secrets.reviewer_app_private_key != '' }}
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.reviewer_app_id }}
+          private-key: ${{ secrets.reviewer_app_private_key }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-checks: read
+
       - name: Validate merge policy
         id: policy
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.reviewer-app-token.outputs.token || github.token }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           OWNER: ${{ github.repository_owner }}
@@ -61,7 +78,7 @@ jobs:
       - name: Squash merge
         if: steps.policy.outputs.validated == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.reviewer-app-token.outputs.token || github.token }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
         run: gh pr merge "$PR" --repo "$REPO" --squash --delete-branch
