@@ -145,7 +145,7 @@ def render_auto_merge(default_branch: str = "main", runs_on: str = '["ubuntu-lat
         "  checks: read\n\n"
         "jobs:\n"
         "  auto-merge:\n"
-        "    uses: Boothey07/ci-workflows/.github/workflows/auto-merge.yml@v2\n"
+        "    uses: Boothey07/ci-workflows/.github/workflows/auto-merge.yml@v3\n"
         f"    with:\n      runs-on: '{runs_on}'\n"
         "    secrets: inherit\n"
     )
