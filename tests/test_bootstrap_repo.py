@@ -47,9 +47,10 @@ def test_master_repositories_use_master_branch_filters():
 
 
 def test_auto_merge_is_opt_in_and_uses_default_branch():
-    workflow = render_auto_merge("master")
+    workflow = render_auto_merge("master", '["self-hosted","linux","x64","vps","example"]')
 
     assert "pull_request_target:" in workflow
     assert "branches: [master]" in workflow
     assert "types: [opened, synchronize, reopened, ready_for_review, labeled]" in workflow
     assert "auto-merge.yml@v2" in workflow
+    assert 'runs-on: \'["self-hosted","linux","x64","vps","example"]\'' in workflow
