@@ -9,6 +9,7 @@ from scripts.bootstrap_repo import (  # noqa: E402
     render_auto_merge,
     render_ci,
     render_post_merge,
+    render_pr_review,
 )
 
 
@@ -54,3 +55,13 @@ def test_auto_merge_is_opt_in_and_uses_default_branch():
     assert "types: [opened, synchronize, reopened, ready_for_review, labeled]" in workflow
     assert "auto-merge.yml@v2" in workflow
     assert 'runs-on: \'["self-hosted","linux","x64","vps","example"]\'' in workflow
+
+
+def test_pr_review_uses_local_model_and_runner():
+    workflow = render_pr_review("master", '["self-hosted","linux","x64","vps","ci"]')
+
+    assert "pull_request_target:" in workflow
+    assert "branches: [master]" in workflow
+    assert "pr-review.yml@v2" in workflow
+    assert "ollama/qwen2.5-coder:7b" in workflow
+    assert 'runs-on: \'["self-hosted","linux","x64","vps","ci"]\'' in workflow

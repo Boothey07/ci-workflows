@@ -18,7 +18,6 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 
-
 API = "https://api.github.com"
 
 
@@ -152,6 +151,36 @@ def render_auto_merge(default_branch: str = "main", runs_on: str = '["ubuntu-lat
     )
 
 
+def render_pr_review(
+    default_branch: str = "main",
+    runs_on: str = '["ubuntu-latest"]',
+    model: str = "ollama/qwen2.5-coder:7b",
+    api_base: str = "http://127.0.0.1:11434",
+) -> str:
+    branches = "[master]" if default_branch == "master" else "[main, dev]"
+    return (
+        "# Managed by Boothey07/ci-workflows.\n"
+        "# Self-hosted PR review; requires a local Ollama model on the runner.\n"
+        "name: PR Review\n\n"
+        "on:\n"
+        "  pull_request_target:\n"
+        f"    branches: {branches}\n"
+        "    types: [opened, reopened, synchronize, ready_for_review, review_requested]\n\n"
+        "permissions:\n"
+        "  contents: read\n"
+        "  pull-requests: write\n"
+        "  issues: write\n\n"
+        "jobs:\n"
+        "  review:\n"
+        "    uses: Boothey07/ci-workflows/.github/workflows/pr-review.yml@v2\n"
+        "    with:\n"
+        f"      runs-on: '{runs_on}'\n"
+        f"      model: '{model}'\n"
+        f"      api-base: '{api_base}'\n"
+        "    secrets: inherit\n"
+    )
+
+
 class GitHub:
     def __init__(self, token: str):
         self.token = token
@@ -240,6 +269,11 @@ def main() -> int:
         action="store_true",
         help="also install the opt-in owner-only auto-merge workflow",
     )
+    parser.add_argument(
+        "--pr-review",
+        action="store_true",
+        help="also install the self-hosted PR-Agent/Ollama review workflow",
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     token = auth_token()
@@ -258,6 +292,8 @@ def main() -> int:
     }
     if args.auto_merge:
         files[".github/workflows/auto-merge.yml"] = render_auto_merge(branch, runs_on)
+    if args.pr_review:
+        files[".github/workflows/pr-review.yml"] = render_pr_review(branch, runs_on)
     print(f"{args.repo}: profile={profile.name} branch={branch} runner={args.runner}")
     if args.dry_run:
         print("dry-run: would write " + ", ".join(files))

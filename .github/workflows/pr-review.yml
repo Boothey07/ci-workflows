@@ -1,0 +1,73 @@
+name: PR Review (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: "JSON runner label array"
+        type: string
+        default: '["ubuntu-latest"]'
+      model:
+        description: "LiteLLM model name, for example ollama/qwen2.5-coder:7b"
+        type: string
+        default: "ollama/qwen2.5-coder:7b"
+      api-base:
+        description: "Model API endpoint reachable from the runner"
+        type: string
+        default: "http://127.0.0.1:11434"
+      pr-agent-version:
+        description: "Pinned PR-Agent package version"
+        type: string
+        default: "0.39.0"
+    secrets:
+      llm-api-key:
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    name: Local PR review
+    # Review comments are advisory; a model/runner outage must not block merges
+    # or create another CI-failure email storm.
+    continue-on-error: true
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PR-Agent
+        run: python -m pip install --disable-pip-version-check "pr-agent==${{ inputs.pr-agent-version }}"
+
+      - name: Verify local model is available
+        env:
+          CONFIG_MODEL: ${{ inputs.model }}
+          OLLAMA_API_BASE: ${{ inputs.api-base }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          model="${CONFIG_MODEL#ollama/}"
+          curl --fail --silent --show-error "$OLLAMA_API_BASE/api/tags" \
+            | jq -e --arg model "$model" \
+              '[.models[].name] | any(. == $model or startswith($model + ":"))' >/dev/null
+
+      - name: Review pull request with local model
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          OPENAI_KEY: ${{ secrets.llm-api-key }}
+          CONFIG_MODEL: ${{ inputs.model }}
+          OLLAMA_API_BASE: ${{ inputs.api-base }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PR_URL"
+          env \
+            "config.model=$CONFIG_MODEL" \
+            "OLLAMA.API_BASE=$OLLAMA_API_BASE" \
+            pr-agent --pr_url "$PR_URL" review
