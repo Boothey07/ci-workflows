@@ -64,7 +64,9 @@ jobs:
           [ -n "$checks" ] || { echo "no checks reported for $SHA"; exit 1; }
           bad=0
           while IFS=$'\t' read -r name status conclusion; do
-            [[ "$name" == "Auto-merge"* ]] && continue
+            # GitHub prefixes reusable-workflow checks with the caller job name,
+            # so the check can appear as "auto-merge / Auto-merge".
+            [[ "${name,,}" == *"auto-merge"* ]] && continue
             printf '%s: %s/%s\n' "$name" "$status" "$conclusion"
             if [ "$status" != "completed" ] || [[ ! "$conclusion" =~ ^(success|skipped|neutral)$ ]]; then
               bad=1
