@@ -7,6 +7,7 @@ detects a simple project profile, and writes:
 - `.github/workflows/ci.yml` for pull requests;
 - `.github/workflows/post-merge.yml` for pushes to `main` or `dev`.
 - optionally `.github/workflows/auto-merge.yml` for guarded owner-only merges.
+- optionally `.github/workflows/auto-repair.yml` for safe Ruff repair PRs.
 
 The tool is dependency-free and defaults to GitHub-hosted runners. A private
 repository can opt into the VPS runner with:
@@ -24,6 +25,10 @@ Automatic merging is deliberately opt-in. Pass `--auto-merge` only after the
 repository has the desired CI checks. A PR must be non-draft, owner-authored,
 labelled `automerge`, and green for its current commit before it is squash
 merged.
+
+Pass `--auto-repair` to add a workflow that responds only to failed trusted
+post-merge push runs. It creates a draft PR for Ruff-only repairs when there
+are changes; it does not modify the default branch directly.
 
 ## Personal-account automation
 

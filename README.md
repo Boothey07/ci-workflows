@@ -78,6 +78,7 @@ failure behaviour, bypass boundaries, and rollout.
 | `secrets.yml` | gitleaks (GitHub's own scanning is public-only without GHAS) |
 | `quality-gate.yml` | collapses named upstream jobs into one required result |
 | `auto-merge.yml` | guarded owner-only squash merge after current-commit checks pass |
+| `auto-repair.yml` | applies safe Ruff fixes after trusted post-merge failures and opens a draft PR |
 | `guard.yml` | files an issue on a direct push to `main` or `dev` — detection, not prevention |
 
 | Component | Purpose |
@@ -131,6 +132,11 @@ explicit `automerge` label, and only after every check for the current head
 commit is successful, skipped, or neutral. It squash-merges and deletes the
 source branch. The label is the human approval switch; do not apply it to
 untrusted or experimental changes.
+
+The optional `--auto-repair` bootstrap flag installs a failure-triggered repair
+workflow. It only reacts to failed `Post-merge CI` push runs, applies Ruff's
+safe automated fixes, and opens a draft PR. It never edits the default branch
+directly.
 
 ## Runners
 

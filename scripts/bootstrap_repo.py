@@ -152,6 +152,26 @@ def render_auto_merge(default_branch: str = "main", runs_on: str = '["ubuntu-lat
     )
 
 
+def render_auto_repair(runs_on: str = '["ubuntu-latest"]') -> str:
+    return (
+        "# Managed by Boothey07/ci-workflows.\n"
+        "# Repairs only trusted post-merge failures and opens a PR for review.\n"
+        "name: Auto-repair CI\n\n"
+        "on:\n"
+        "  workflow_run:\n"
+        "    workflows: [Post-merge CI]\n"
+        "    types: [completed]\n\n"
+        "permissions:\n"
+        "  contents: write\n"
+        "  pull-requests: write\n\n"
+        "jobs:\n"
+        "  repair:\n"
+        "    uses: Boothey07/ci-workflows/.github/workflows/auto-repair.yml@v2\n"
+        f"    with:\n      runs-on: '{runs_on}'\n"
+        "    secrets: inherit\n"
+    )
+
+
 class GitHub:
     def __init__(self, token: str):
         self.token = token
@@ -221,6 +241,70 @@ class GitHub:
             raise RuntimeError(f"cannot write {repo}/{path}: {result}")
         return "updated" if sha else "created"
 
+    def write_files(
+        self,
+        repo: str,
+        branch: str,
+        files: dict[str, str],
+        message: str,
+        force: bool,
+    ) -> dict[str, str]:
+        """Update all managed files in one commit to avoid duplicate CI runs."""
+        encoded_branch = urllib.parse.quote(branch, safe="")
+        status, ref = self.request("GET", f"/repos/{repo}/git/ref/heads/{encoded_branch}")
+        if status != 200 or not isinstance(ref, dict):
+            raise RuntimeError(f"cannot inspect {repo}/{branch}: {ref}")
+        parent_sha = ref["object"]["sha"]
+        status, commit = self.request("GET", f"/repos/{repo}/git/commits/{parent_sha}")
+        if status != 200 or not isinstance(commit, dict):
+            raise RuntimeError(f"cannot inspect {repo} commit {parent_sha}: {commit}")
+        base_tree = commit["tree"]["sha"]
+        status, tree = self.request("GET", f"/repos/{repo}/git/trees/{base_tree}?recursive=1")
+        if status != 200 or not isinstance(tree, dict):
+            raise RuntimeError(f"cannot inspect {repo} tree {base_tree}: {tree}")
+        existing = {entry["path"] for entry in tree.get("tree", []) if entry.get("type") == "blob"}
+
+        statuses: dict[str, str] = {}
+        entries = []
+        for path, content in files.items():
+            if path in existing and not force:
+                statuses[path] = "exists"
+                continue
+            status, blob = self.request(
+                "POST",
+                f"/repos/{repo}/git/blobs",
+                {"content": content, "encoding": "utf-8"},
+            )
+            if status != 201 or not isinstance(blob, dict):
+                raise RuntimeError(f"cannot create blob for {repo}/{path}: {blob}")
+            entries.append({"path": path, "mode": "100644", "type": "blob", "sha": blob["sha"]})
+            statuses[path] = "updated" if path in existing else "created"
+
+        if not entries:
+            return statuses
+        status, new_tree = self.request(
+            "POST",
+            f"/repos/{repo}/git/trees",
+            {"base_tree": base_tree, "tree": entries},
+        )
+        if status != 201 or not isinstance(new_tree, dict):
+            raise RuntimeError(f"cannot create managed tree for {repo}: {new_tree}")
+        status, new_commit = self.request(
+            "POST",
+            f"/repos/{repo}/git/commits",
+            {"message": message, "tree": new_tree["sha"], "parents": [parent_sha]},
+        )
+        if status != 201 or not isinstance(new_commit, dict):
+            raise RuntimeError(f"cannot create managed commit for {repo}: {new_commit}")
+        status, result = self.request(
+            "PATCH",
+            f"/repos/{repo}/git/refs/heads/{encoded_branch}",
+            {"sha": new_commit["sha"], "force": False},
+        )
+        if status != 200:
+            raise RuntimeError(f"cannot update {repo}/{branch}: {result}")
+        return statuses
+
 
 def auth_token() -> str:
     if os.environ.get("GH_TOKEN"):
@@ -240,6 +324,11 @@ def main() -> int:
         action="store_true",
         help="also install the opt-in owner-only auto-merge workflow",
     )
+    parser.add_argument(
+        "--auto-repair",
+        action="store_true",
+        help="also install the safe Ruff auto-repair workflow",
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     token = auth_token()
@@ -258,12 +347,14 @@ def main() -> int:
     }
     if args.auto_merge:
         files[".github/workflows/auto-merge.yml"] = render_auto_merge(branch, runs_on)
+    if args.auto_repair:
+        files[".github/workflows/auto-repair.yml"] = render_auto_repair(runs_on)
     print(f"{args.repo}: profile={profile.name} branch={branch} runner={args.runner}")
     if args.dry_run:
         print("dry-run: would write " + ", ".join(files))
         return 0
-    for path, content in files.items():
-        result = github.write_file(args.repo, branch, path, content, "ci: attach reusable quality gates", args.force)
+    results = github.write_files(args.repo, branch, files, "ci: attach reusable quality gates", args.force)
+    for path, result in results.items():
         print(f"{path}: {result}")
     return 0
 

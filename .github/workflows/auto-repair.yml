@@ -1,0 +1,69 @@
+name: Auto-repair (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: "JSON runner label array"
+        type: string
+        default: '["ubuntu-latest"]'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  repair:
+    name: Auto-repair Ruff failures
+    if: >-
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.name == 'Post-merge CI'
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    steps:
+      - name: Check out failed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up Python
+        if: hashFiles('**/*.py') != ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Apply safe Ruff fixes
+        if: hashFiles('**/*.py') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install 'ruff==0.15.21'
+          ruff check . --fix --output-format=concise || true
+          ruff format .
+
+      - name: Open repair PR
+        if: hashFiles('**/*.py') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo 'No safe Ruff changes found.'
+            exit 0
+          fi
+          branch="codex/auto-repair-${RUN_ID}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          git add -A
+          git commit -m 'fix: apply safe CI lint repairs'
+          git push --set-upstream origin "$branch"
+          gh pr create --repo "$REPO" --draft \
+            --base "${{ github.event.workflow_run.head_branch }}" \
+            --head "$branch" \
+            --title 'fix: apply safe CI lint repairs' \
+            --body "Automated safe Ruff repairs for failed Post-merge CI run ${RUN_ID} (${SHA}). Review the diff before marking this PR ready."
