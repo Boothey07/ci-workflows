@@ -275,6 +275,11 @@ def main() -> int:
         action="store_true",
         help="also install the self-hosted PR-Agent/Ollama review workflow",
     )
+    parser.add_argument(
+        "--pr-review-only",
+        action="store_true",
+        help="install only the self-hosted PR reviewer caller; leave existing CI unchanged",
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     token = auth_token()
@@ -287,13 +292,13 @@ def main() -> int:
         branch = repo_data["default_branch"]
     profile = detect_profile(github.root_files(args.repo, branch))
     runs_on = runner_json(args.runner, args.runner_labels)
-    files = {
+    files = {} if args.pr_review_only else {
         ".github/workflows/ci.yml": render_ci(profile, runs_on, branch),
         ".github/workflows/post-merge.yml": render_post_merge(profile, runs_on, branch),
     }
     if args.auto_merge:
         files[".github/workflows/auto-merge.yml"] = render_auto_merge(branch, runs_on)
-    if args.pr_review:
+    if args.pr_review or args.pr_review_only:
         files[".github/workflows/pr-review.yml"] = render_pr_review(branch, runs_on)
     print(f"{args.repo}: profile={profile.name} branch={branch} runner={args.runner}")
     if args.dry_run:
