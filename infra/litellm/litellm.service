@@ -1,0 +1,15 @@
+[Unit]
+Description=Local LiteLLM model gateway for CI review
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=/root/.openclaw/.env
+ExecStart=/opt/litellm/bin/litellm --config /etc/litellm/config.yaml --host 127.0.0.1 --port 4000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+model_list:
+  - model_name: pr-review-minimax
+    litellm_params:
+      model: minimax/MiniMax-M3
+      api_key: os.environ/MINIMAX_API_KEY
+      api_base: https://api.minimax.io/v1
+
+router_settings:
+  routing_strategy: simple-shuffle
+  num_retries: 2
+
+litellm_settings:
+  drop_params: true

@@ -154,13 +154,13 @@ def render_auto_merge(default_branch: str = "main", runs_on: str = '["ubuntu-lat
 def render_pr_review(
     default_branch: str = "main",
     runs_on: str = '["ubuntu-latest"]',
-    model: str = "ollama/qwen2.5-coder:7b",
-    api_base: str = "http://127.0.0.1:11434",
+    model: str = "openai/pr-review-minimax",
+    api_base: str = "http://127.0.0.1:4000/v1",
 ) -> str:
     branches = "[master]" if default_branch == "master" else "[main, dev]"
     return (
         "# Managed by Boothey07/ci-workflows.\n"
-        "# Self-hosted PR review; requires a local Ollama model on the runner.\n"
+        "# Self-hosted PR review through the VPS LiteLLM gateway.\n"
         "name: PR Review\n\n"
         "on:\n"
         "  pull_request_target:\n"

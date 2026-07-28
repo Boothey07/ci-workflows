@@ -145,10 +145,9 @@ python scripts/bootstrap_repo.py Boothey07/example \
   --pr-review --force
 ```
 
-The reusable workflow pins PR-Agent and defaults to Ollama's
-`qwen2.5-coder:7b` through `http://127.0.0.1:11434`. The runner must have the
-model available locally. An API key can be passed through the optional
-`llm-api-key` secret when a repository needs a fallback model. Reviews run under
+The reusable workflow pins PR-Agent and defaults to the VPS LiteLLM alias
+`openai/pr-review-minimax`. LiteLLM keeps provider credentials on the VPS and
+currently routes that alias to MiniMax M3. Reviews run under
 `pull_request_target` with read-only code access and write access limited to PR
 comments/issues. A successful review automatically converts a draft PR to ready
 for review; the separate `automerge` label remains required before merging.

@@ -8,13 +8,13 @@ on:
         type: string
         default: '["ubuntu-latest"]'
       model:
-        description: "LiteLLM model name, for example ollama/qwen2.5-coder:7b"
+        description: "LiteLLM gateway model name"
         type: string
-        default: "ollama/qwen2.5-coder:7b"
+        default: "openai/pr-review-minimax"
       api-base:
-        description: "Model API endpoint reachable from the runner"
+        description: "LiteLLM gateway endpoint reachable from the runner"
         type: string
-        default: "http://127.0.0.1:11434"
+        default: "http://127.0.0.1:4000/v1"
       pr-agent-version:
         description: "Pinned PR-Agent package version"
         type: string
@@ -51,21 +51,25 @@ jobs:
       - name: Verify local model is available
         env:
           CONFIG_MODEL: ${{ inputs.model }}
-          OLLAMA_API_BASE: ${{ inputs.api-base }}
+          LITELLM_API_BASE: ${{ inputs.api-base }}
         shell: bash
         run: |
           set -euo pipefail
-          model="${CONFIG_MODEL#ollama/}"
-          curl --fail --silent --show-error "$OLLAMA_API_BASE/api/tags" \
-            | jq -e --arg model "$model" \
-              '[.models[].name] | any(. == $model or startswith($model + ":"))' >/dev/null
+          curl --fail --silent --show-error "$LITELLM_API_BASE/models" \
+            | jq -e --arg model "$CONFIG_MODEL" \
+              '.data | any(.id == $model or .id == ($model | sub("^openai/"; "")))' >/dev/null
 
       - name: Review pull request with local model
         env:
           GITHUB_TOKEN: ${{ github.token }}
           OPENAI_KEY: ${{ secrets.llm-api-key }}
           CONFIG_MODEL: ${{ inputs.model }}
-          OLLAMA_API_BASE: ${{ inputs.api-base }}
+          OPENAI_API_BASE: ${{ inputs.api-base }}
+          OPENAI_API_KEY: ${{ secrets['llm-api-key'] }}
+          OPENAI__API_BASE: ${{ inputs.api-base }}
+          OPENAI__KEY: ${{ secrets['llm-api-key'] }}
+          CONFIG_CUSTOM_MODEL_MAX_TOKENS: "8192"
+          CONFIG_FALLBACK_MODELS: "[]"
           PR_URL: ${{ github.event.pull_request.html_url }}
         shell: bash
         run: |
@@ -73,7 +77,8 @@ jobs:
           test -n "$PR_URL"
           env \
             "config.model=$CONFIG_MODEL" \
-            "OLLAMA.API_BASE=$OLLAMA_API_BASE" \
+            "config.custom_model_max_tokens=$CONFIG_CUSTOM_MODEL_MAX_TOKENS" \
+            "config.fallback_models=$CONFIG_FALLBACK_MODELS" \
             pr-agent --pr_url "$PR_URL" review
 
       - name: Mark reviewed PR ready
