@@ -4,9 +4,9 @@ on:
   workflow_call:
     inputs:
       runs-on:
-        description: "JSON runner label array"
+        description: "Runner label"
         type: string
-        default: '["ubuntu-latest"]'
+        default: 'self-hosted'
     secrets:
       reviewer_app_id:
         required: false
@@ -21,7 +21,7 @@ permissions:
 jobs:
   merge:
     name: Auto-merge
-    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    runs-on: ${{ inputs.runs-on }}
     if: >-
       github.event.pull_request.draft == false &&
       contains(github.event.pull_request.labels.*.name, 'automerge')
