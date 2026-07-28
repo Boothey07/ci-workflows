@@ -23,7 +23,13 @@ EXCLUDED = {"ci-workflows", "ci-pr-reviewer", "ci-pr-reviewer-ui"}
 def explicit_repositories() -> set[str]:
     raw = os.environ.get("MANAGED_REPOSITORIES", "")
     names = {item.strip() for item in raw.replace(",", "\n").splitlines() if item.strip()}
-    return {name if "/" in name else f"{OWNER}/{name}" for name in names}
+    repositories = {name if "/" in name else f"{OWNER}/{name}" for name in names}
+    invalid = sorted(repo for repo in repositories if repo.split("/", 1)[0] != OWNER)
+    if invalid:
+        raise ValueError(
+            f"MANAGED_REPOSITORIES contains repositories outside {OWNER}: {', '.join(invalid)}"
+        )
+    return repositories
 
 
 def discovered_repositories(github: GitHub) -> set[str]:
@@ -38,16 +44,21 @@ def discovered_repositories(github: GitHub) -> set[str]:
             raise RuntimeError(f"cannot list App repositories: {body}")
         batch = body.get("repositories", [])
         for repo in batch:
-            created = datetime.fromisoformat(repo["created_at"].replace("Z", "+00:00"))
+            created_at = repo.get("created_at")
+            name = repo.get("name")
+            full_name = repo.get("full_name")
+            if not all(isinstance(value, str) and value for value in (created_at, name, full_name)):
+                continue
+            created = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
             if (
                 repo.get("owner", {}).get("login") == OWNER
                 and repo.get("private")
                 and not repo.get("archived")
                 and not repo.get("fork")
-                and repo["name"] not in EXCLUDED
+                and name not in EXCLUDED
                 and created >= cutoff
             ):
-                repositories.add(repo["full_name"])
+                repositories.add(full_name)
         if len(batch) < 100:
             break
         page += 1
@@ -58,6 +69,8 @@ def sync_repository(github: GitHub, repo: str) -> None:
     status, metadata = github.request("GET", f"/repos/{repo}")
     if status != 200 or not isinstance(metadata, dict):
         raise RuntimeError(f"cannot inspect {repo}: {metadata}")
+    if metadata.get("owner", {}).get("login") != OWNER:
+        raise RuntimeError(f"refusing to manage repository outside {OWNER}: {repo}")
     if metadata.get("archived"):
         return
     branch = metadata["default_branch"]
