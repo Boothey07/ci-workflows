@@ -28,8 +28,7 @@ jobs:
     steps:
       - name: Create reviewer App token
         id: reviewer-app-token
-        if: ${{ secrets.reviewer_app_id != '' && secrets.reviewer_app_private_key != '' }}
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.reviewer_app_id }}
           private-key: ${{ secrets.reviewer_app_private_key }}
