@@ -6,10 +6,8 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 from scripts.bootstrap_repo import (  # noqa: E402
     RepoProfile,
     detect_profile,
-    render_auto_merge,
     render_ci,
     render_post_merge,
-    render_pr_review,
 )
 
 
@@ -45,30 +43,3 @@ def test_master_repositories_use_master_branch_filters():
 
     assert "branches: [master]" in workflow
     assert "branches: [main, dev]" not in workflow
-
-
-def test_auto_merge_is_opt_in_and_uses_default_branch():
-    workflow = render_auto_merge("master", '["self-hosted","linux","x64","vps","example"]')
-
-    assert "pull_request_target:" in workflow
-    assert "workflow_run:" in workflow
-    assert "branches: [master]" in workflow
-    assert "types: [opened, synchronize, reopened, ready_for_review, labeled]" in workflow
-    assert "auto-merge.yml@v9" in workflow
-    assert "runs-on: ubuntu-latest" in workflow
-    assert "reviewer_app_private_key: ${{ secrets.REVIEWER_APP_PRIVATE_KEY }}" in workflow
-
-
-def test_pr_review_uses_local_model_and_runner():
-    workflow = render_pr_review("master", '["self-hosted","linux","x64","vps","ci"]')
-
-    assert "pull_request_target:" in workflow
-    assert "branches: [master]" in workflow
-    assert "types: [opened, reopened, synchronize, ready_for_review, review_requested]" in workflow
-    assert "ci-pr-reviewer/.github/workflows/pr-review.yml@v5" in workflow
-    assert "openai/pr-review-minimax" in workflow
-    assert 'runs-on: \'["self-hosted","linux","x64","vps","ci"]\'' in workflow
-    assert "mark-ready: true" in workflow
-    assert "auto-merge: true" in workflow
-    assert "auto-fix: true" in workflow
-    assert "reviewer_app_private_key: ${{ secrets.REVIEWER_APP_PRIVATE_KEY }}" in workflow

@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from bootstrap_repo import (
     GitHub,
@@ -14,7 +14,6 @@ from bootstrap_repo import (
     render_post_merge,
     runner_json,
 )
-
 
 OWNER = os.environ.get("REPOSITORY_OWNER", "Boothey07")
 DISCOVER_AFTER = os.environ.get("AUTO_DISCOVER_AFTER", "2026-07-29T00:00:00Z")
@@ -30,7 +29,7 @@ def explicit_repositories() -> set[str]:
 def discovered_repositories(github: GitHub) -> set[str]:
     if os.environ.get("DISABLE_AUTO_DISCOVERY", "false").lower() == "true":
         return set()
-    cutoff = datetime.fromisoformat(DISCOVER_AFTER.replace("Z", "+00:00")).astimezone(timezone.utc)
+    cutoff = datetime.fromisoformat(DISCOVER_AFTER.replace("Z", "+00:00")).astimezone(UTC)
     repositories: set[str] = set()
     page = 1
     while True:

@@ -31,17 +31,20 @@ class RepoProfile:
 
 def detect_profile(files: set[str]) -> RepoProfile:
     basenames = {name.rsplit("/", 1)[-1] for name in files}
-    python = bool(basenames & {"pyproject.toml", "setup.py", "setup.cfg", "Pipfile"}) or any(
-        name.startswith(("requirements", "environment")) and name.endswith((".txt", ".yml", ".yaml"))
-        for name in basenames
-    ) or any(path.endswith(".py") for path in files)
-    node = "package.json" in basenames
-    tests = any(
-        part.startswith(("test", "tests"))
-        for path in files
-        for part in path.split("/")
+    python = (
+        bool(basenames & {"pyproject.toml", "setup.py", "setup.cfg", "Pipfile"})
+        or any(
+            name.startswith(("requirements", "environment"))
+            and name.endswith((".txt", ".yml", ".yaml"))
+            for name in basenames
+        )
+        or any(path.endswith(".py") for path in files)
     )
-    name = "python-node" if python and node else "python" if python else "node" if node else "generic"
+    node = "package.json" in basenames
+    tests = any(part.startswith(("test", "tests")) for path in files for part in path.split("/"))
+    name = (
+        "python-node" if python and node else "python" if python else "node" if node else "generic"
+    )
     return RepoProfile(name=name, python=python, node=node, tests=tests)
 
 
@@ -73,9 +76,9 @@ def render_ci(profile: RepoProfile, runs_on: str, default_branch: str = "main") 
             "  python:\n"
             "    uses: Boothey07/ci-workflows/.github/workflows/python-ci.yml@v9\n"
             "    with:\n"
-            "      paths: \".\"\n"
-            "      lint-paths: \".\"\n"
-            "      python-versions: '[\"3.11\",\"3.12\",\"3.13\"]'\n"
+            '      paths: "."\n'
+            '      lint-paths: "."\n'
+            '      python-versions: \'["3.11","3.12","3.13"]\'\n'
             f"      runs-on: '{runs_on}'\n"
             f"      run-tests: {'true' if profile.tests else 'false'}\n"
         )
@@ -86,10 +89,10 @@ def render_ci(profile: RepoProfile, runs_on: str, default_branch: str = "main") 
             "    uses: Boothey07/ci-workflows/.github/workflows/node-ci.yml@v9\n"
             "    with:\n"
             f"      runs-on: '{runs_on}'\n"
-            "      install-command: \"npm ci\"\n"
-            "      lint-command: \"npm run lint --if-present\"\n"
-            "      build-command: \"npm run build --if-present\"\n"
-            "      test-command: \"npm test --if-present\"\n"
+            '      install-command: "npm ci"\n'
+            '      lint-command: "npm run lint --if-present"\n'
+            '      build-command: "npm run build --if-present"\n'
+            '      test-command: "npm test --if-present"\n'
         )
     jobs.append(
         "  quality-gate:\n"
@@ -108,8 +111,7 @@ def render_ci(profile: RepoProfile, runs_on: str, default_branch: str = "main") 
         "name: CI\n\n"
         f"on:\n  pull_request:\n    branches: {branches}\n\n"
         "permissions:\n  contents: read\n  issues: read\n  pull-requests: read\n\n"
-        "jobs:\n"
-        + "\n".join(jobs)
+        "jobs:\n" + "\n".join(jobs)
     )
 
 
@@ -129,80 +131,13 @@ def render_post_merge(profile: RepoProfile, runs_on: str, default_branch: str = 
     return body
 
 
-def render_auto_merge(default_branch: str = "main", runs_on: str = '["ubuntu-latest"]') -> str:
-    branches = "[master]" if default_branch == "master" else "[main, dev]"
-    return (
-        "# Managed by Boothey07/ci-workflows.\n"
-        "# This workflow is opt-in: apply the 'automerge' label to a trusted PR.\n"
-        "name: Auto-merge\n\n"
-        "on:\n"
-        "  pull_request_target:\n"
-        f"    branches: {branches}\n"
-        "    types: [opened, synchronize, reopened, ready_for_review, labeled]\n"
-        "  workflow_run:\n"
-        "    workflows: [CI]\n"
-        "    types: [completed]\n\n"
-        "permissions:\n"
-        "  contents: write\n"
-        "  pull-requests: write\n"
-        "  checks: read\n\n"
-        "jobs:\n"
-        "  auto-merge:\n"
-        "    if: >-\n"
-        "      (github.event_name == 'pull_request_target') ||\n"
-        "      (github.event.workflow_run.conclusion == 'success' &&\n"
-        "       github.event.workflow_run.pull_requests[0] != null)\n"
-        "    uses: Boothey07/ci-workflows/.github/workflows/auto-merge.yml@v9\n"
-        "    with:\n"
-        "      pr-number: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}\n"
-        "      head-sha: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}\n"
-        "      runs-on: ubuntu-latest\n"
-        "    secrets:\n"
-        "      reviewer_app_id: ${{ secrets.REVIEWER_APP_ID }}\n"
-        "      reviewer_app_private_key: ${{ secrets.REVIEWER_APP_PRIVATE_KEY }}\n"
-    )
-
-
-def render_pr_review(
-    default_branch: str = "main",
-    runs_on: str = '["ubuntu-latest"]',
-    model: str = "openai/pr-review-minimax",
-    api_base: str = "http://127.0.0.1:4000/v1",
-) -> str:
-    branches = "[master]" if default_branch == "master" else "[main, dev]"
-    return (
-        "# Managed by Boothey07/ci-workflows.\n"
-        "# Self-hosted PR review through the VPS LiteLLM gateway.\n"
-        "name: PR Review\n\n"
-        "on:\n"
-        "  pull_request_target:\n"
-        f"    branches: {branches}\n"
-        "    types: [opened, reopened, synchronize, ready_for_review, review_requested]\n\n"
-        "permissions:\n"
-        "  contents: write\n"
-        "  pull-requests: write\n"
-        "  issues: write\n\n"
-        "jobs:\n"
-        "  review:\n"
-        "    uses: Boothey07/ci-pr-reviewer/.github/workflows/pr-review.yml@v5\n"
-        "    with:\n"
-        f"      runs-on: '{runs_on}'\n"
-        f"      model: '{model}'\n"
-        f"      api-base: '{api_base}'\n"
-        "      mark-ready: true\n"
-        "      auto-merge: true\n"
-        "      auto-fix: true\n"
-        "    secrets:\n"
-        "      reviewer_app_id: ${{ secrets.REVIEWER_APP_ID }}\n"
-        "      reviewer_app_private_key: ${{ secrets.REVIEWER_APP_PRIVATE_KEY }}\n"
-    )
-
-
 class GitHub:
     def __init__(self, token: str):
         self.token = token
 
-    def request(self, method: str, path: str, payload: dict | None = None) -> tuple[int, dict | list]:
+    def request(
+        self, method: str, path: str, payload: dict | None = None
+    ) -> tuple[int, dict | list]:
         url = API + path
         data = json.dumps(payload).encode() if payload is not None else None
         request = urllib.request.Request(
@@ -250,7 +185,9 @@ class GitHub:
             raise RuntimeError(f"cannot inspect {repo}: {body}")
         return {entry["path"] for entry in body.get("tree", []) if entry.get("type") == "blob"}
 
-    def write_file(self, repo: str, branch: str, path: str, content: str, message: str, force: bool) -> str:
+    def write_file(
+        self, repo: str, branch: str, path: str, content: str, message: str, force: bool
+    ) -> str:
         encoded = urllib.parse.quote(path, safe="/")
         query = urllib.parse.urlencode({"ref": branch})
         status, existing = self.request("GET", f"/repos/{repo}/contents/{encoded}?{query}")
@@ -259,7 +196,11 @@ class GitHub:
             raise RuntimeError(f"cannot inspect {repo}/{path}: {existing}")
         if sha and not force:
             return "exists"
-        payload = {"message": message, "content": base64.b64encode(content.encode()).decode(), "branch": branch}
+        payload = {
+            "message": message,
+            "content": base64.b64encode(content.encode()).decode(),
+            "branch": branch,
+        }
         if sha:
             payload["sha"] = sha
         status, result = self.request("PUT", f"/repos/{repo}/contents/{encoded}", payload)
@@ -305,6 +246,12 @@ class GitHub:
             else:
                 raise RuntimeError(f"cannot inspect {repo}/{path}: {existing}")
 
+        conflicts = sorted(path for path, result in results.items() if result == "exists")
+        if conflicts:
+            raise RuntimeError(
+                "managed workflows differ and were not changed without --force: "
+                + ", ".join(conflicts)
+            )
         if not changed:
             return results
 
@@ -329,7 +276,9 @@ class GitHub:
             )
             if status != 201 or not isinstance(blob, dict):
                 raise RuntimeError(f"cannot create blob for {repo}/{path}: {blob}")
-            tree_entries.append({"path": path, "mode": "100644", "type": "blob", "sha": blob["sha"]})
+            tree_entries.append(
+                {"path": path, "mode": "100644", "type": "blob", "sha": blob["sha"]}
+            )
 
         status, tree = self.request(
             "POST",
@@ -366,23 +315,10 @@ def main() -> int:
     parser.add_argument("repo", help="owner/name")
     parser.add_argument("--branch", default=None, help="default branch; detected when omitted")
     parser.add_argument("--runner", choices=("hosted", "self-hosted"), default="hosted")
-    parser.add_argument("--runner-labels", default="self-hosted,linux,x64,vps", help="comma-separated labels")
+    parser.add_argument(
+        "--runner-labels", default="self-hosted,linux,x64,vps", help="comma-separated labels"
+    )
     parser.add_argument("--force", action="store_true", help="replace existing caller workflows")
-    parser.add_argument(
-        "--auto-merge",
-        action="store_true",
-        help="also install the opt-in owner-only auto-merge workflow",
-    )
-    parser.add_argument(
-        "--pr-review",
-        action="store_true",
-        help="also install the self-hosted PR-Agent/Ollama review workflow",
-    )
-    parser.add_argument(
-        "--pr-review-only",
-        action="store_true",
-        help="install only the self-hosted PR reviewer caller; leave existing CI unchanged",
-    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     token = auth_token()
@@ -395,14 +331,10 @@ def main() -> int:
         branch = repo_data["default_branch"]
     profile = detect_profile(github.root_files(args.repo, branch))
     runs_on = runner_json(args.runner, args.runner_labels)
-    files = {} if args.pr_review_only else {
+    files = {
         ".github/workflows/ci.yml": render_ci(profile, runs_on, branch),
         ".github/workflows/post-merge.yml": render_post_merge(profile, runs_on, branch),
     }
-    if args.auto_merge:
-        files[".github/workflows/auto-merge.yml"] = render_auto_merge(branch, runs_on)
-    if args.pr_review or args.pr_review_only:
-        files[".github/workflows/pr-review.yml"] = render_pr_review(branch, runs_on)
     print(f"{args.repo}: profile={profile.name} branch={branch} runner={args.runner}")
     if args.dry_run:
         print("dry-run: would write " + ", ".join(files))
@@ -424,4 +356,4 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except (RuntimeError, ValueError, subprocess.CalledProcessError) as error:
         print(f"error: {error}", file=sys.stderr)
-        raise SystemExit(1)
+        raise SystemExit(1) from error

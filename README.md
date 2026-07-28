@@ -77,8 +77,7 @@ failure behaviour, bypass boundaries, and rollout.
 | `pr-hygiene.yml` | branch naming, Conventional-Commit PR title, verified linked issue |
 | `secrets.yml` | gitleaks (GitHub's own scanning is public-only without GHAS) |
 | `quality-gate.yml` | collapses named upstream jobs into one required result |
-| `auto-merge.yml` | guarded owner-only squash merge after current-commit checks pass |
-| `pr-review-caller.yml` | this repository's VPS-backed caller for `ci-pr-reviewer` |
+| `rollout.yml` | scheduled synchronization of managed personal repositories |
 | `guard.yml` | files an issue on a direct push to `main` or `dev` — detection, not prevention |
 
 | Component | Purpose |
@@ -116,48 +115,15 @@ quality-gate:
 Pin a tag rather than moving `main`; one bad central edit must not break every
 consumer at once.
 
-## Opt-in automatic merging
+## Central review and automatic merging
 
-The bootstrap tool can install an opt-in auto-merge caller:
-
-```bash
-python scripts/bootstrap_repo.py Boothey07/example \
-  --runner self-hosted \
-  --runner-labels self-hosted,linux,x64,vps,example \
-  --auto-merge --force
-```
-
-The workflow only acts on a non-draft, owner-authored pull request with the
-explicit `automerge` label, and only after every check for the current head
-commit is successful, skipped, or neutral. It squash-merges and deletes the
-source branch. The label is the human approval switch; do not apply it to
-untrusted or experimental changes.
-
-## Self-hosted AI PR review
-
-Install the local reviewer caller with:
-
-```bash
-python scripts/bootstrap_repo.py Boothey07/example \
-  --runner self-hosted \
-  --runner-labels self-hosted,linux,x64,vps,example \
-  --pr-review --force
-```
-
-The reusable reviewer now lives in the private `Boothey07/ci-pr-reviewer`
-repository. This module only installs the caller, which uses the VPS LiteLLM
-alias `openai/pr-review-minimax`; LiteLLM keeps provider credentials on the VPS
-and currently routes that alias to MiniMax M3. Reviews run under
-`pull_request_target` with read-only code access and write access limited to PR
-comments/issues. A successful review automatically converts a draft PR to ready
-for review; the separate `automerge` label remains required before merging.
-
-For comments to come from a separate identity, install a GitHub App such as
-`ci-review-bot` on the repositories and configure the reusable workflow secrets
-`reviewer-app-id` and `reviewer-app-private-key`. A dedicated bot PAT can be
-provided as `reviewer-token` for a simpler setup, but the App identity is
-preferred. Without either, the workflow falls back to the repository token and
-comments appear as the repository owner.
+The private `Boothey07/ci-pr-reviewer-ui` control plane discovers repositories
+carrying the managed CI marker. It reviews owner-authored pull requests through
+the VPS LiteLLM alias `openai/pr-review-minimax`, submits a formal review as the
+`ci-review-bot` GitHub App, promotes clean drafts, performs bounded repairs, and
+squash-merges only after the current revision has a successful Quality Gate.
+Consumer repositories do not receive separate review or merge workflows, which
+avoids duplicate executions and notification spam.
 
 ## Runners
 
