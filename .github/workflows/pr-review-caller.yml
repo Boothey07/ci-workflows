@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   review:
-    uses: Boothey07/ci-pr-reviewer/.github/workflows/pr-review.yml@v2
+      uses: Boothey07/ci-pr-reviewer/.github/workflows/pr-review.yml@v3
     with:
       runs-on: '["self-hosted","linux","x64","vps","ci"]'
       mark-ready: true
