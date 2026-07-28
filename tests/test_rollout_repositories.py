@@ -9,6 +9,7 @@ from rollout_repositories import (  # noqa: E402
     discovered_repositories,
     explicit_repositories,
     sync_repository,
+    sync_repository_with_retry,
 )
 
 
@@ -59,3 +60,19 @@ def test_sync_refuses_repository_outside_owner():
 
     with pytest.raises(RuntimeError, match="outside Boothey07"):
         sync_repository(github, "OtherOwner/unsafe")
+
+
+def test_sync_retries_transient_repository_failure(monkeypatch):
+    calls = []
+
+    def flaky_sync(github, repo):
+        calls.append(repo)
+        if len(calls) < 3:
+            raise RuntimeError("temporary API failure")
+
+    monkeypatch.setattr("rollout_repositories.sync_repository", flaky_sync)
+    monkeypatch.setattr("rollout_repositories.time.sleep", lambda delay: None)
+
+    sync_repository_with_retry(object(), "Boothey07/example")
+
+    assert calls == ["Boothey07/example"] * 3

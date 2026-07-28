@@ -119,7 +119,9 @@ consumer at once.
 
 The private `Boothey07/ci-pr-reviewer-ui` control plane discovers repositories
 carrying the managed CI marker. It reviews owner-authored pull requests through
-the VPS LiteLLM alias `openai/pr-review-minimax`, submits a formal review as the
+the PR-Agent model identifier `openai/pr-review-minimax` (the `openai/` prefix
+selects PR-Agent's OpenAI-compatible client; LiteLLM receives the configured
+`pr-review-minimax` alias), submits a formal review as the
 `ci-review-bot` GitHub App, promotes clean drafts, performs bounded repairs, and
 squash-merges only after the current revision has a successful Quality Gate.
 Consumer repositories do not receive separate review or merge workflows, which

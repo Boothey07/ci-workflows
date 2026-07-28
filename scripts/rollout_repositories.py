@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import time
 from datetime import UTC, datetime
 
 from bootstrap_repo import (
@@ -94,13 +95,31 @@ def sync_repository(github: GitHub, repo: str) -> None:
     print(f"{repo}: {changed}")
 
 
+def sync_repository_with_retry(
+    github: GitHub,
+    repo: str,
+    *,
+    attempts: int = 3,
+) -> None:
+    for attempt in range(1, attempts + 1):
+        try:
+            sync_repository(github, repo)
+            return
+        except Exception:
+            if attempt == attempts:
+                raise
+            delay = 2 ** (attempt - 1)
+            print(f"{repo}: sync attempt {attempt}/{attempts} failed; retrying in {delay}s")
+            time.sleep(delay)
+
+
 def main() -> int:
     github = GitHub(auth_token())
     repositories = explicit_repositories() | discovered_repositories(github)
     failures = []
     for repo in sorted(repositories):
         try:
-            sync_repository(github, repo)
+            sync_repository_with_retry(github, repo)
         except Exception as error:
             failures.append(f"{repo}: {error}")
     if failures:
