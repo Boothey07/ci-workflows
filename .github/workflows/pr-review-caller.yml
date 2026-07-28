@@ -3,7 +3,7 @@ name: PR Review
 on:
   pull_request_target:
     branches: [main]
-    types: [opened, reopened, synchronize, review_requested]
+    types: [opened, reopened, synchronize, ready_for_review, review_requested]
 
 concurrency:
   group: pr-review-${{ github.event.pull_request.number }}
