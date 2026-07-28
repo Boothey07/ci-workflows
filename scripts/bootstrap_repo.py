@@ -172,7 +172,7 @@ def render_pr_review(
         "  issues: write\n\n"
         "jobs:\n"
         "  review:\n"
-        "    uses: Boothey07/ci-workflows/.github/workflows/pr-review.yml@v2\n"
+        "    uses: Boothey07/ci-pr-reviewer/.github/workflows/pr-review.yml@v1\n"
         "    with:\n"
         f"      runs-on: '{runs_on}'\n"
         f"      model: '{model}'\n"

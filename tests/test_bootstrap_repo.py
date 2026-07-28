@@ -63,7 +63,7 @@ def test_pr_review_uses_local_model_and_runner():
     assert "pull_request_target:" in workflow
     assert "branches: [master]" in workflow
     assert "types: [opened, reopened, synchronize, review_requested]" in workflow
-    assert "pr-review.yml@v2" in workflow
+    assert "ci-pr-reviewer/.github/workflows/pr-review.yml@v1" in workflow
     assert "openai/pr-review-minimax" in workflow
     assert 'runs-on: \'["self-hosted","linux","x64","vps","ci"]\'' in workflow
     assert "mark-ready: true" in workflow

@@ -78,8 +78,7 @@ failure behaviour, bypass boundaries, and rollout.
 | `secrets.yml` | gitleaks (GitHub's own scanning is public-only without GHAS) |
 | `quality-gate.yml` | collapses named upstream jobs into one required result |
 | `auto-merge.yml` | guarded owner-only squash merge after current-commit checks pass |
-| `pr-review.yml` | self-hosted PR-Agent review through a local Ollama model |
-| `pr-review-caller.yml` | this repository's own VPS-backed PR review caller |
+| `pr-review-caller.yml` | this repository's VPS-backed caller for `ci-pr-reviewer` |
 | `guard.yml` | files an issue on a direct push to `main` or `dev` — detection, not prevention |
 
 | Component | Purpose |
@@ -145,9 +144,10 @@ python scripts/bootstrap_repo.py Boothey07/example \
   --pr-review --force
 ```
 
-The reusable workflow pins PR-Agent and defaults to the VPS LiteLLM alias
-`openai/pr-review-minimax`. LiteLLM keeps provider credentials on the VPS and
-currently routes that alias to MiniMax M3. Reviews run under
+The reusable reviewer now lives in the private `Boothey07/ci-pr-reviewer`
+repository. This module only installs the caller, which uses the VPS LiteLLM
+alias `openai/pr-review-minimax`; LiteLLM keeps provider credentials on the VPS
+and currently routes that alias to MiniMax M3. Reviews run under
 `pull_request_target` with read-only code access and write access limited to PR
 comments/issues. A successful review automatically converts a draft PR to ready
 for review; the separate `automerge` label remains required before merging.
