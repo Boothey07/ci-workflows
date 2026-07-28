@@ -26,6 +26,15 @@ on:
     secrets:
       llm-api-key:
         required: false
+      reviewer-token:
+        description: "Dedicated bot PAT; superseded by the GitHub App secrets"
+        required: false
+      reviewer-app-id:
+        description: "GitHub App ID for the reviewer bot"
+        required: false
+      reviewer-app-private-key:
+        description: "GitHub App private key for the reviewer bot"
+        required: false
 
 permissions:
   contents: read
@@ -48,6 +57,18 @@ jobs:
       - name: Install PR-Agent
         run: python -m pip install --disable-pip-version-check "pr-agent==${{ inputs.pr-agent-version }}"
 
+      - name: Create reviewer GitHub App token
+        id: reviewer-app-token
+        if: ${{ secrets['reviewer-app-id'] != '' && secrets['reviewer-app-private-key'] != '' }}
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets['reviewer-app-id'] }}
+          private-key: ${{ secrets['reviewer-app-private-key'] }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: read
+          permission-pull-requests: write
+          permission-issues: write
+
       - name: Verify local model is available
         env:
           CONFIG_MODEL: ${{ inputs.model }}
@@ -61,7 +82,7 @@ jobs:
 
       - name: Review pull request with local model
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ steps.reviewer-app-token.outputs.token || secrets['reviewer-token'] || github.token }}
           OPENAI_KEY: ${{ secrets.llm-api-key }}
           CONFIG_MODEL: ${{ inputs.model }}
           OPENAI_API_BASE: ${{ inputs.api-base }}

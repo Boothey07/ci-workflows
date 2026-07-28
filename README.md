@@ -152,6 +152,13 @@ currently routes that alias to MiniMax M3. Reviews run under
 comments/issues. A successful review automatically converts a draft PR to ready
 for review; the separate `automerge` label remains required before merging.
 
+For comments to come from a separate identity, install a GitHub App such as
+`ci-review-bot` on the repositories and configure the reusable workflow secrets
+`reviewer-app-id` and `reviewer-app-private-key`. A dedicated bot PAT can be
+provided as `reviewer-token` for a simpler setup, but the App identity is
+preferred. Without either, the workflow falls back to the repository token and
+comments appear as the repository owner.
+
 ## Runners
 
 `runs-on` defaults to `["ubuntu-latest"]`. Where a self-hosted runner is
