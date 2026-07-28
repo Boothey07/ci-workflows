@@ -38,12 +38,16 @@ def discovered_repositories(github: GitHub) -> set[str]:
         return set()
     cutoff = datetime.fromisoformat(DISCOVER_AFTER.replace("Z", "+00:00")).astimezone(UTC)
     repositories: set[str] = set()
+    listed = 0
     page = 1
     while True:
         status, body = github.request("GET", f"/installation/repositories?per_page=100&page={page}")
         if status != 200 or not isinstance(body, dict):
             raise RuntimeError(f"cannot list App repositories: {body}")
         batch = body.get("repositories", [])
+        if not isinstance(batch, list):
+            raise RuntimeError(f"invalid App repository page: {body}")
+        listed += len(batch)
         for repo in batch:
             created_at = repo.get("created_at")
             name = repo.get("name")
@@ -60,7 +64,15 @@ def discovered_repositories(github: GitHub) -> set[str]:
                 and created >= cutoff
             ):
                 repositories.add(full_name)
-        if len(batch) < 100:
+        total_count = body.get("total_count")
+        if isinstance(total_count, int):
+            if listed >= total_count:
+                break
+            if not batch:
+                raise RuntimeError(
+                    f"App repository listing stopped at {listed}/{total_count} repositories"
+                )
+        elif len(batch) < 100:
             break
         page += 1
     return repositories

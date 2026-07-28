@@ -55,6 +55,34 @@ def test_discovery_skips_malformed_repository_entries(monkeypatch):
     assert discovered_repositories(github) == {"Boothey07/new-private"}
 
 
+def test_discovery_uses_total_count_across_short_pages(monkeypatch):
+    monkeypatch.setenv("DISABLE_AUTO_DISCOVERY", "false")
+    github = FakeGitHub(
+        [
+            (200, {"total_count": 2, "repositories": [{"name": "malformed"}]}),
+            (
+                200,
+                {
+                    "total_count": 2,
+                    "repositories": [
+                        {
+                            "name": "new-private",
+                            "full_name": "Boothey07/new-private",
+                            "created_at": "2026-07-29T00:00:01Z",
+                            "private": True,
+                            "archived": False,
+                            "fork": False,
+                            "owner": {"login": "Boothey07"},
+                        }
+                    ],
+                },
+            ),
+        ]
+    )
+
+    assert discovered_repositories(github) == {"Boothey07/new-private"}
+
+
 def test_sync_refuses_repository_outside_owner():
     github = FakeGitHub([(200, {"owner": {"login": "OtherOwner"}})])
 

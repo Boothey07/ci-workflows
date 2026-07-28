@@ -127,6 +127,11 @@ squash-merges only after the current revision has a successful Quality Gate.
 Consumer repositories do not receive separate review or merge workflows, which
 avoids duplicate executions and notification spam.
 
+The managed `.github/workflows/ci.yml` and `post-merge.yml` callers are
+controller-owned and intentionally replaced on every rollout.
+Repository-specific checks belong in reusable workflow inputs or separate workflow files;
+manual edits inside those two generated callers are not preserved.
+
 ## Runners
 
 `runs-on` defaults to `["ubuntu-latest"]`. Where a self-hosted runner is
