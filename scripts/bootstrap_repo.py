@@ -60,10 +60,10 @@ def render_ci(profile: RepoProfile, runs_on: str, default_branch: str = "main") 
     jobs.extend(
         [
             "  hygiene:\n"
-            "    uses: Boothey07/ci-workflows/.github/workflows/pr-hygiene.yml@v2\n"
+            "    uses: Boothey07/ci-workflows/.github/workflows/pr-hygiene.yml@v9\n"
             f"    with:\n      runs-on: '{runs_on}'\n",
             "  secrets:\n"
-            "    uses: Boothey07/ci-workflows/.github/workflows/secrets.yml@v2\n"
+            "    uses: Boothey07/ci-workflows/.github/workflows/secrets.yml@v9\n"
             f"    with:\n      runs-on: '{runs_on}'\n",
         ]
     )
@@ -71,7 +71,7 @@ def render_ci(profile: RepoProfile, runs_on: str, default_branch: str = "main") 
         required.append("python")
         jobs.append(
             "  python:\n"
-            "    uses: Boothey07/ci-workflows/.github/workflows/python-ci.yml@v2\n"
+            "    uses: Boothey07/ci-workflows/.github/workflows/python-ci.yml@v9\n"
             "    with:\n"
             "      paths: \".\"\n"
             "      lint-paths: \".\"\n"
@@ -83,7 +83,7 @@ def render_ci(profile: RepoProfile, runs_on: str, default_branch: str = "main") 
         required.append("frontend")
         jobs.append(
             "  frontend:\n"
-            "    uses: Boothey07/ci-workflows/.github/workflows/node-ci.yml@v2\n"
+            "    uses: Boothey07/ci-workflows/.github/workflows/node-ci.yml@v9\n"
             "    with:\n"
             f"      runs-on: '{runs_on}'\n"
             "      install-command: \"npm ci\"\n"
@@ -96,7 +96,7 @@ def render_ci(profile: RepoProfile, runs_on: str, default_branch: str = "main") 
         "    name: Quality Gate\n"
         "    if: always()\n"
         f"    needs: [{', '.join(required)}]\n"
-        "    uses: Boothey07/ci-workflows/.github/workflows/quality-gate.yml@v2\n"
+        "    uses: Boothey07/ci-workflows/.github/workflows/quality-gate.yml@v9\n"
         "    with:\n"
         "      results: ${{ toJSON(needs) }}\n"
         f"      required-jobs: {','.join(required)}\n"
@@ -152,7 +152,7 @@ def render_auto_merge(default_branch: str = "main", runs_on: str = '["ubuntu-lat
         "      (github.event_name == 'pull_request_target') ||\n"
         "      (github.event.workflow_run.conclusion == 'success' &&\n"
         "       github.event.workflow_run.pull_requests[0] != null)\n"
-        "    uses: Boothey07/ci-workflows/.github/workflows/auto-merge.yml@v8\n"
+        "    uses: Boothey07/ci-workflows/.github/workflows/auto-merge.yml@v9\n"
         "    with:\n"
         "      pr-number: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}\n"
         "      head-sha: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}\n"
@@ -267,6 +267,93 @@ class GitHub:
             raise RuntimeError(f"cannot write {repo}/{path}: {result}")
         return "updated" if sha else "created"
 
+    def write_files(
+        self,
+        repo: str,
+        branch: str,
+        files: dict[str, str | None],
+        message: str,
+        force: bool,
+    ) -> dict[str, str]:
+        """Write all managed files in one commit, skipping unchanged content."""
+        changed: dict[str, str | None] = {}
+        results: dict[str, str] = {}
+        for path, content in files.items():
+            encoded = urllib.parse.quote(path, safe="/")
+            query = urllib.parse.urlencode({"ref": branch})
+            status, existing = self.request("GET", f"/repos/{repo}/contents/{encoded}?{query}")
+            if status == 200 and isinstance(existing, dict):
+                if content is None:
+                    changed[path] = None
+                    results[path] = "deleted"
+                    continue
+                current = base64.b64decode(existing["content"]).decode()
+                if current == content:
+                    results[path] = "unchanged"
+                    continue
+                if not force:
+                    results[path] = "exists"
+                    continue
+                changed[path] = content
+                results[path] = "updated"
+            elif status == 404:
+                if content is None:
+                    results[path] = "absent"
+                    continue
+                changed[path] = content
+                results[path] = "created"
+            else:
+                raise RuntimeError(f"cannot inspect {repo}/{path}: {existing}")
+
+        if not changed:
+            return results
+
+        encoded_branch = urllib.parse.quote(branch, safe="")
+        status, ref = self.request("GET", f"/repos/{repo}/git/ref/heads/{encoded_branch}")
+        if status != 200 or not isinstance(ref, dict):
+            raise RuntimeError(f"cannot read {repo}@{branch}: {ref}")
+        parent_sha = ref["object"]["sha"]
+        status, parent = self.request("GET", f"/repos/{repo}/git/commits/{parent_sha}")
+        if status != 200 or not isinstance(parent, dict):
+            raise RuntimeError(f"cannot read parent commit for {repo}: {parent}")
+
+        tree_entries = []
+        for path, content in changed.items():
+            if content is None:
+                tree_entries.append({"path": path, "mode": "100644", "type": "blob", "sha": None})
+                continue
+            status, blob = self.request(
+                "POST",
+                f"/repos/{repo}/git/blobs",
+                {"content": content, "encoding": "utf-8"},
+            )
+            if status != 201 or not isinstance(blob, dict):
+                raise RuntimeError(f"cannot create blob for {repo}/{path}: {blob}")
+            tree_entries.append({"path": path, "mode": "100644", "type": "blob", "sha": blob["sha"]})
+
+        status, tree = self.request(
+            "POST",
+            f"/repos/{repo}/git/trees",
+            {"base_tree": parent["tree"]["sha"], "tree": tree_entries},
+        )
+        if status != 201 or not isinstance(tree, dict):
+            raise RuntimeError(f"cannot create tree for {repo}: {tree}")
+        status, commit = self.request(
+            "POST",
+            f"/repos/{repo}/git/commits",
+            {"message": message, "tree": tree["sha"], "parents": [parent_sha]},
+        )
+        if status != 201 or not isinstance(commit, dict):
+            raise RuntimeError(f"cannot create commit for {repo}: {commit}")
+        status, result = self.request(
+            "PATCH",
+            f"/repos/{repo}/git/refs/heads/{encoded_branch}",
+            {"sha": commit["sha"], "force": False},
+        )
+        if status != 200:
+            raise RuntimeError(f"cannot update {repo}@{branch}: {result}")
+        return results
+
 
 def auth_token() -> str:
     if os.environ.get("GH_TOKEN"):
@@ -320,8 +407,14 @@ def main() -> int:
     if args.dry_run:
         print("dry-run: would write " + ", ".join(files))
         return 0
-    for path, content in files.items():
-        result = github.write_file(args.repo, branch, path, content, "ci: attach reusable quality gates", args.force)
+    results = github.write_files(
+        args.repo,
+        branch,
+        files,
+        "ci: attach reusable quality gates",
+        args.force,
+    )
+    for path, result in results.items():
         print(f"{path}: {result}")
     return 0
 

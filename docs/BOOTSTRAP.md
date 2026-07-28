@@ -27,13 +27,12 @@ merged.
 
 ## Personal-account automation
 
-The first rollout uses this tool explicitly against a small cohort. Once the
-profiles are stable, run it from a VPS timer that periodically lists active
-repositories and bootstraps only repositories missing the managed workflow.
-That provides automatic onboarding without requiring an organization. A
-GitHub App/webhook can replace the timer later without changing the bootstrap
-logic.
+The scheduled `Synchronize managed repositories` workflow keeps the explicit
+repository set in the `MANAGED_REPOSITORIES` secret synchronized in a single
+commit per repository. Private repositories created after the configured
+cutover date are enrolled automatically.
 
-The default is intentionally GitHub-hosted CI. Repository-level VPS runners
-are opt-in because each personal-account repository needs its own runner
-registration and self-hosted jobs must remain limited to private, trusted code.
+The central reviewer service provisions missing repository-scoped VPS runners
+for managed private repositories and owns review, repair, readiness, and merge
+progression. Repository Actions are limited to CI and post-merge validation,
+which avoids duplicate review/merge runs and notification spam.

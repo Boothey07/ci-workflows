@@ -24,8 +24,8 @@ def test_rendered_ci_has_only_detected_required_jobs():
 
     assert "jobs:\n" in workflow
     assert "pull-requests: read" in workflow
-    assert "python-ci.yml@v2" in workflow
-    assert "node-ci.yml@v2" not in workflow
+    assert "python-ci.yml@v9" in workflow
+    assert "node-ci.yml@v9" not in workflow
     assert "required-jobs: hygiene,secrets,python" in workflow
     assert "run-tests: false" in workflow
 
@@ -54,7 +54,7 @@ def test_auto_merge_is_opt_in_and_uses_default_branch():
     assert "workflow_run:" in workflow
     assert "branches: [master]" in workflow
     assert "types: [opened, synchronize, reopened, ready_for_review, labeled]" in workflow
-    assert "auto-merge.yml@v8" in workflow
+    assert "auto-merge.yml@v9" in workflow
     assert "runs-on: ubuntu-latest" in workflow
     assert "reviewer_app_private_key: ${{ secrets.REVIEWER_APP_PRIVATE_KEY }}" in workflow
 
