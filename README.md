@@ -79,6 +79,7 @@ failure behaviour, bypass boundaries, and rollout.
 | `quality-gate.yml` | collapses named upstream jobs into one required result |
 | `auto-merge.yml` | guarded owner-only squash merge after current-commit checks pass |
 | `pr-review.yml` | self-hosted PR-Agent review through a local Ollama model |
+| `pr-review-caller.yml` | this repository's own VPS-backed PR review caller |
 | `guard.yml` | files an issue on a direct push to `main` or `dev` — detection, not prevention |
 
 | Component | Purpose |

@@ -1,0 +1,23 @@
+name: PR Review
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, review_requested]
+
+concurrency:
+  group: pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    uses: ./.github/workflows/pr-review.yml
+    with:
+      runs-on: '["self-hosted","linux","x64","vps","ci"]'
+      mark-ready: true
+    secrets: inherit
