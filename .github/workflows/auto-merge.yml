@@ -2,6 +2,11 @@ name: Auto-merge (reusable)
 
 on:
   workflow_call:
+    inputs:
+      runs-on:
+        description: "JSON runner label array"
+        type: string
+        default: '["ubuntu-latest"]'
 
 permissions:
   contents: write
@@ -11,10 +16,10 @@ permissions:
 jobs:
   merge:
     name: Auto-merge
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
     if: >-
       github.event.pull_request.draft == false &&
-      contains(github.event.pull_request.labels.*.name, 'automerge'))
+      contains(github.event.pull_request.labels.*.name, 'automerge')
     steps:
       - name: Validate merge policy
         id: policy

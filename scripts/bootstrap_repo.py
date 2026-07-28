@@ -130,7 +130,7 @@ def render_post_merge(profile: RepoProfile, runs_on: str, default_branch: str = 
     return body
 
 
-def render_auto_merge(default_branch: str = "main") -> str:
+def render_auto_merge(default_branch: str = "main", runs_on: str = '["ubuntu-latest"]') -> str:
     branches = "[master]" if default_branch == "master" else "[main, dev]"
     return (
         "# Managed by Boothey07/ci-workflows.\n"
@@ -147,6 +147,7 @@ def render_auto_merge(default_branch: str = "main") -> str:
         "jobs:\n"
         "  auto-merge:\n"
         "    uses: Boothey07/ci-workflows/.github/workflows/auto-merge.yml@v2\n"
+        f"    with:\n      runs-on: '{runs_on}'\n"
         "    secrets: inherit\n"
     )
 
@@ -256,7 +257,7 @@ def main() -> int:
         ".github/workflows/post-merge.yml": render_post_merge(profile, runs_on, branch),
     }
     if args.auto_merge:
-        files[".github/workflows/auto-merge.yml"] = render_auto_merge(branch)
+        files[".github/workflows/auto-merge.yml"] = render_auto_merge(branch, runs_on)
     print(f"{args.repo}: profile={profile.name} branch={branch} runner={args.runner}")
     if args.dry_run:
         print("dry-run: would write " + ", ".join(files))
