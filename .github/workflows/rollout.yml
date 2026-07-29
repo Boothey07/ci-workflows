@@ -1,0 +1,35 @@
+name: Synchronize managed repositories
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: managed-repository-rollout
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  synchronize:
+    runs-on: [self-hosted, linux, x64, vps, ci]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create reviewer App token
+        id: reviewer-app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.REVIEWER_APP_ID }}
+          private-key: ${{ secrets.REVIEWER_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+
+      - name: Synchronize repository workflows
+        env:
+          GH_TOKEN: ${{ steps.reviewer-app-token.outputs.token }}
+          MANAGED_REPOSITORIES: ${{ secrets.MANAGED_REPOSITORIES }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: python3 scripts/rollout_repositories.py

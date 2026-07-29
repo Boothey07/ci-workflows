@@ -6,7 +6,6 @@ detects a simple project profile, and writes:
 
 - `.github/workflows/ci.yml` for pull requests;
 - `.github/workflows/post-merge.yml` for pushes to `main` or `dev`.
-- optionally `.github/workflows/auto-merge.yml` for guarded owner-only merges.
 
 The tool is dependency-free and defaults to GitHub-hosted runners. A private
 repository can opt into the VPS runner with:
@@ -20,20 +19,15 @@ GH_TOKEN=... python scripts/bootstrap_repo.py Boothey07/example \
 Use `--dry-run` to inspect profile detection. Existing caller workflows are
 left untouched unless `--force` is supplied.
 
-Automatic merging is deliberately opt-in. Pass `--auto-merge` only after the
-repository has the desired CI checks. A PR must be non-draft, owner-authored,
-labelled `automerge`, and green for its current commit before it is squash
-merged.
-
 ## Personal-account automation
 
-The first rollout uses this tool explicitly against a small cohort. Once the
-profiles are stable, run it from a VPS timer that periodically lists active
-repositories and bootstraps only repositories missing the managed workflow.
-That provides automatic onboarding without requiring an organization. A
-GitHub App/webhook can replace the timer later without changing the bootstrap
-logic.
+The scheduled `Synchronize managed repositories` workflow keeps the explicit
+repository set in the `MANAGED_REPOSITORIES` secret synchronized in a single
+commit per repository. Private repositories created after the configured
+cutover date are enrolled automatically.
 
-The default is intentionally GitHub-hosted CI. Repository-level VPS runners
-are opt-in because each personal-account repository needs its own runner
-registration and self-hosted jobs must remain limited to private, trusted code.
+The central reviewer service provisions missing repository-scoped VPS runners
+for managed private repositories and owns review, repair, readiness, and merge
+progression through the GitHub App. Repository Actions are deliberately limited
+to CI and post-merge validation; no elevated `pull_request_target` caller is
+installed in consumer repositories.

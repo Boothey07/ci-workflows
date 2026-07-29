@@ -6,7 +6,6 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 from scripts.bootstrap_repo import (  # noqa: E402
     RepoProfile,
     detect_profile,
-    render_auto_merge,
     render_ci,
     render_post_merge,
 )
@@ -23,8 +22,8 @@ def test_rendered_ci_has_only_detected_required_jobs():
 
     assert "jobs:\n" in workflow
     assert "pull-requests: read" in workflow
-    assert "python-ci.yml@v2" in workflow
-    assert "node-ci.yml@v2" not in workflow
+    assert "python-ci.yml@v9" in workflow
+    assert "node-ci.yml@v9" not in workflow
     assert "required-jobs: hygiene,secrets,python" in workflow
     assert "run-tests: false" in workflow
 
@@ -44,13 +43,3 @@ def test_master_repositories_use_master_branch_filters():
 
     assert "branches: [master]" in workflow
     assert "branches: [main, dev]" not in workflow
-
-
-def test_auto_merge_is_opt_in_and_uses_default_branch():
-    workflow = render_auto_merge("master", '["self-hosted","linux","x64","vps","example"]')
-
-    assert "pull_request_target:" in workflow
-    assert "branches: [master]" in workflow
-    assert "types: [opened, synchronize, reopened, ready_for_review, labeled]" in workflow
-    assert "auto-merge.yml@v2" in workflow
-    assert 'runs-on: \'["self-hosted","linux","x64","vps","example"]\'' in workflow

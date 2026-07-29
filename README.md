@@ -77,7 +77,7 @@ failure behaviour, bypass boundaries, and rollout.
 | `pr-hygiene.yml` | branch naming, Conventional-Commit PR title, verified linked issue |
 | `secrets.yml` | gitleaks (GitHub's own scanning is public-only without GHAS) |
 | `quality-gate.yml` | collapses named upstream jobs into one required result |
-| `auto-merge.yml` | guarded owner-only squash merge after current-commit checks pass |
+| `rollout.yml` | scheduled synchronization of managed personal repositories |
 | `guard.yml` | files an issue on a direct push to `main` or `dev` — detection, not prevention |
 
 | Component | Purpose |
@@ -115,22 +115,22 @@ quality-gate:
 Pin a tag rather than moving `main`; one bad central edit must not break every
 consumer at once.
 
-## Opt-in automatic merging
+## Central review and automatic merging
 
-The bootstrap tool can install an opt-in auto-merge caller:
+The private `Boothey07/ci-pr-reviewer-ui` control plane discovers repositories
+carrying the managed CI marker. It reviews owner-authored pull requests through
+the PR-Agent model identifier `openai/pr-review-minimax` (the `openai/` prefix
+selects PR-Agent's OpenAI-compatible client; LiteLLM receives the configured
+`pr-review-minimax` alias), submits a formal review as the
+`ci-review-bot` GitHub App, promotes clean drafts, performs bounded repairs, and
+squash-merges only after the current revision has a successful Quality Gate.
+Consumer repositories do not receive separate review or merge workflows, which
+avoids duplicate executions and notification spam.
 
-```bash
-python scripts/bootstrap_repo.py Boothey07/example \
-  --runner self-hosted \
-  --runner-labels self-hosted,linux,x64,vps,example \
-  --auto-merge --force
-```
-
-The workflow only acts on a non-draft, owner-authored pull request with the
-explicit `automerge` label, and only after every check for the current head
-commit is successful, skipped, or neutral. It squash-merges and deletes the
-source branch. The label is the human approval switch; do not apply it to
-untrusted or experimental changes.
+The managed `.github/workflows/ci.yml` and `post-merge.yml` callers are
+controller-owned and intentionally replaced on every rollout.
+Repository-specific checks belong in reusable workflow inputs or separate workflow files;
+manual edits inside those two generated callers are not preserved.
 
 ## Runners
 
