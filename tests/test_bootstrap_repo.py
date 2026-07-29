@@ -38,6 +38,23 @@ def test_detects_swift_package_as_apple_project():
     assert profile.tests is True
 
 
+def test_detects_root_xcodegen_project():
+    profile = detect_profile(
+        {
+            "project.yml",
+            "Sources/WakeFlow/App.swift",
+            "Sources/WakeFlowWidgets/NextAlarmWidget.swift",
+            "Tests/WakeFlowTests/AlarmTests.swift",
+        }
+    )
+
+    assert profile.apple is True
+    assert profile.apple_working_directory == "."
+    assert profile.apple_scheme == "WakeFlow"
+    assert profile.apple_build_system == "xcodebuild"
+    assert profile.tests is True
+
+
 def test_detects_xcode_project():
     assert detect_apple_project({"ios/App/App.xcodeproj/project.pbxproj"}) == ("ios/App", "App")
 
