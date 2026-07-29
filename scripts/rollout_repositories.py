@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 from datetime import UTC, datetime
 
@@ -19,6 +20,15 @@ from bootstrap_repo import (
 OWNER = os.environ.get("REPOSITORY_OWNER", "Boothey07")
 DISCOVER_AFTER = os.environ.get("AUTO_DISCOVER_AFTER", "2026-07-29T00:00:00Z")
 EXCLUDED = {"ci-workflows", "ci-pr-reviewer", "ci-pr-reviewer-ui"}
+
+
+def runner_repo_label(repo: str) -> str:
+    """Return the stable repo-specific runner label used by repo-scoped runners."""
+    name = repo.split("/", 1)[1]
+    label = re.sub(r"[^a-z0-9-]+", "-", name.lower()).strip("-")
+    if not label:
+        raise ValueError(f"cannot derive runner label for {repo}")
+    return label
 
 
 def explicit_repositories() -> set[str]:
@@ -100,11 +110,12 @@ def sync_repository(github: GitHub, repo: str) -> None:
         return
     branch = metadata["default_branch"]
     profile = detect_profile(github.root_files(repo, branch))
-    labels = f"self-hosted,linux,x64,vps,{repo.split('/', 1)[1]}"
+    repo_label = runner_repo_label(repo)
+    labels = f"self-hosted,linux,x64,vps,{repo_label}"
     runs_on = runner_json("self-hosted", labels)
     mac_runs_on = None
     if profile.apple and repo in mac_runner_repositories():
-        mac_labels = f"self-hosted,macOS,ARM64,ios,{repo.split('/', 1)[1]}"
+        mac_labels = f"self-hosted,macOS,ARM64,ios,{repo_label}"
         mac_runs_on = runner_json("self-hosted", mac_labels)
     files: dict[str, str | None] = {
         ".github/workflows/ci.yml": render_ci(profile, runs_on, branch, mac_runs_on),

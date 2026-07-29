@@ -9,6 +9,7 @@ from rollout_repositories import (  # noqa: E402
     discovered_repositories,
     explicit_repositories,
     mac_runner_repositories,
+    runner_repo_label,
     sync_repository,
     sync_repository_with_retry,
 )
@@ -33,6 +34,11 @@ def test_mac_runner_repositories_normalizes_names(monkeypatch):
     monkeypatch.setenv("MAC_RUNNER_REPOSITORIES", "bjj-health-app, Boothey07/ios-app")
 
     assert mac_runner_repositories() == {"Boothey07/bjj-health-app", "Boothey07/ios-app"}
+
+
+def test_runner_repo_label_is_lowercase_and_safe():
+    assert runner_repo_label("Boothey07/BatteryControl") == "batterycontrol"
+    assert runner_repo_label("Boothey07/bjj-health-app") == "bjj-health-app"
 
 
 def test_discovery_skips_malformed_repository_entries(monkeypatch):
