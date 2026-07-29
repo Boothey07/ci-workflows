@@ -1,0 +1,21 @@
+[Unit]
+Description=Local LiteLLM model gateway for CI review
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=litellm
+Group=litellm
+EnvironmentFile=/etc/litellm/litellm.env
+ExecStart=/opt/litellm/bin/litellm --config /etc/litellm/config.yaml --host 127.0.0.1 --port 4000
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/litellm
+
+[Install]
+WantedBy=multi-user.target

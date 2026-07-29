@@ -1,0 +1,7 @@
+{
+  "name": "claude-code",
+  "command": "claude",
+  "instruction_file": "CLAUDE.md",
+  "role": "Thin adapter only; all policy is rendered from policy/default.yaml.",
+  "optional_native_control": "Claude Code PreToolUse may call oak-git, but oak-agent remains the portable boundary."
+}

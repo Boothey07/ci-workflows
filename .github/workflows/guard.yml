@@ -16,6 +16,10 @@ on:
         description: 'Comma-separated protected-by-convention branches.'
         type: string
         default: "main,dev"
+      runs-on:
+        description: 'JSON runner label array.'
+        type: string
+        default: '["ubuntu-latest"]'
 
 permissions:
   contents: read
@@ -24,7 +28,7 @@ permissions:
 jobs:
   guard:
     name: Direct-push guard
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
     steps:
       - name: Was this push a merge from a PR?
         id: check

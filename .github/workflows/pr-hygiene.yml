@@ -15,6 +15,10 @@ on:
         description: 'Pipe-separated allowed branch/commit types.'
         type: string
         default: "feat|fix|chore|docs|refactor|test|perf|ci|deps|hotfix"
+      runs-on:
+        description: 'JSON runner label array, e.g. ["self-hosted","linux","x64","vps"].'
+        type: string
+        default: '["ubuntu-latest"]'
 
 permissions:
   contents: read
@@ -24,7 +28,7 @@ permissions:
 jobs:
   hygiene:
     name: PR hygiene
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
     steps:
       - name: Branch name
         env:
@@ -33,8 +37,9 @@ jobs:
           REQUIRE_ISSUE: ${{ inputs.require-issue }}
         run: |
           echo "branch: $BRANCH"
-          # Bot branches are exempt — we don't control how they're named.
-          if printf '%s' "$BRANCH" | grep -qE '^(dependabot|coderabbitai|renovate)/'; then
+          # Bot and Codex branches are exempt — their naming is controlled by
+          # automation rather than the individual contributor.
+          if printf '%s' "$BRANCH" | grep -qE '^(dependabot|coderabbitai|renovate|codex|agent)/'; then
             echo "bot branch — exempt"; exit 0
           fi
           if [ "$REQUIRE_ISSUE" = "true" ]; then
@@ -73,7 +78,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
-          if printf '%s' "$BRANCH" | grep -qE '^(dependabot|coderabbitai|renovate)/'; then
+          if printf '%s' "$BRANCH" | grep -qE '^(dependabot|coderabbitai|renovate|codex|agent)/'; then
             echo "bot branch — exempt"; exit 0
           fi
           num=$(printf '%s' "$BRANCH" | sed -E 's|^[a-z]+/([0-9]+)-.*|\1|')

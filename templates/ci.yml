@@ -9,22 +9,52 @@ on:
 
 permissions:
   contents: read
+  issues: read
+  pull-requests: read
 
 jobs:
   hygiene:
-    uses: Boothey07/ci-workflows/.github/workflows/pr-hygiene.yml@v1.1
+    uses: Boothey07/ci-workflows/.github/workflows/pr-hygiene.yml@v2
+    with:
+      # Change to '["self-hosted","linux","x64","vps"]' when registered.
+      runs-on: '["ubuntu-latest"]'
 
   secrets:
-    uses: Boothey07/ci-workflows/.github/workflows/secrets.yml@v1.1
+    uses: Boothey07/ci-workflows/.github/workflows/secrets.yml@v2
+    with:
+      # Change to '["self-hosted","linux","x64","vps"]' when registered.
+      runs-on: '["ubuntu-latest"]'
 
   python:
-    uses: Boothey07/ci-workflows/.github/workflows/python-ci.yml@v1.1
+    uses: Boothey07/ci-workflows/.github/workflows/python-ci.yml@v2
     with:
       paths: "."
       python-versions: '["3.11","3.12","3.13"]'
+      lint-paths: "."
       # Stay off billed minutes where a runner is registered for this repo:
-      # runs-on: '["self-hosted","linux","vps"]'
+      runs-on: '["ubuntu-latest"]'
       #
       # Only turn this on where tests actually exist. A green "Test" job that
       # ran nothing is worse than no job at all — it reads as coverage.
       run-tests: false
+
+  # Remove this job when the repository has no frontend package.json.
+  frontend:
+    uses: Boothey07/ci-workflows/.github/workflows/node-ci.yml@v2
+    with:
+      # Change to '["self-hosted","linux","x64","vps"]' when registered.
+      runs-on: '["ubuntu-latest"]'
+      install-command: "npm ci"
+      lint-command: "npm run lint --if-present"
+      build-command: "npm run build --if-present"
+      test-command: "npm test --if-present"
+
+  quality-gate:
+    name: Quality Gate
+    if: always()
+    needs: [hygiene, secrets, python, frontend]
+    uses: Boothey07/ci-workflows/.github/workflows/quality-gate.yml@v2
+    with:
+      results: ${{ toJSON(needs) }}
+      required-jobs: hygiene,secrets,python,frontend
+      runs-on: '["ubuntu-latest"]'
