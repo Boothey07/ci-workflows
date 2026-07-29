@@ -39,7 +39,7 @@ jobs:
           echo "branch: $BRANCH"
           # Bot and Codex branches are exempt — their naming is controlled by
           # automation rather than the individual contributor.
-          if printf '%s' "$BRANCH" | grep -qE '^(dependabot|coderabbitai|renovate|codex|agent)/'; then
+          if printf '%s' "$BRANCH" | grep -qE '^(dependabot|coderabbitai|renovate|codex|agent|ci-bot)/'; then
             echo "bot branch — exempt"; exit 0
           fi
           if [ "$REQUIRE_ISSUE" = "true" ]; then
@@ -78,7 +78,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
-          if printf '%s' "$BRANCH" | grep -qE '^(dependabot|coderabbitai|renovate|codex|agent)/'; then
+          if printf '%s' "$BRANCH" | grep -qE '^(dependabot|coderabbitai|renovate|codex|agent|ci-bot)/'; then
             echo "bot branch — exempt"; exit 0
           fi
           num=$(printf '%s' "$BRANCH" | sed -E 's|^[a-z]+/([0-9]+)-.*|\1|')
