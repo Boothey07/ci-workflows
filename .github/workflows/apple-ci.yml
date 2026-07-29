@@ -8,9 +8,13 @@ on:
         type: string
         default: '["self-hosted","macOS","ARM64","ios"]'
       working-directory:
-        description: 'Directory containing the XcodeGen project.yml or Xcode project.'
+        description: 'Directory containing the XcodeGen/Xcode project or Package.swift.'
         type: string
         default: "."
+      build-system:
+        description: 'Build mode: xcodebuild or swift-package.'
+        type: string
+        default: "xcodebuild"
       xcodegen:
         description: 'Run xcodegen generate before building.'
         type: boolean
@@ -35,13 +39,25 @@ on:
         description: 'Homebrew prefix to add to PATH for launchd-based runners.'
         type: string
         default: "/opt/homebrew/bin"
+      run-tests:
+        description: 'Run Swift Package tests after build.'
+        type: boolean
+        default: true
+      swift-build-command:
+        description: 'Swift Package build command.'
+        type: string
+        default: "swift build"
+      swift-test-command:
+        description: 'Swift Package test command.'
+        type: string
+        default: "swift test"
 
 permissions:
   contents: read
 
 jobs:
   build:
-    name: Build (iOS Simulator, unsigned)
+    name: Apple build
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     defaults:
       run:
@@ -64,7 +80,7 @@ jobs:
           swift --version
 
       - name: Ensure XcodeGen is available
-        if: inputs.xcodegen
+        if: inputs.build-system == 'xcodebuild' && inputs.xcodegen
         run: |
           if command -v xcodegen >/dev/null 2>&1; then
             xcodegen --version
@@ -73,10 +89,11 @@ jobs:
           fi
 
       - name: Generate Xcode project
-        if: inputs.xcodegen
+        if: inputs.build-system == 'xcodebuild' && inputs.xcodegen
         run: xcodegen generate
 
       - name: Build for simulator (no code signing)
+        if: inputs.build-system == 'xcodebuild'
         env:
           INPUT_PROJECT: ${{ inputs.project }}
           INPUT_SCHEME: ${{ inputs.scheme }}
@@ -105,3 +122,11 @@ jobs:
             -destination '${{ inputs.destination }}' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+
+      - name: Build Swift Package
+        if: inputs.build-system == 'swift-package'
+        run: ${{ inputs.swift-build-command }}
+
+      - name: Test Swift Package
+        if: inputs.build-system == 'swift-package' && inputs.run-tests
+        run: ${{ inputs.swift-test-command }}

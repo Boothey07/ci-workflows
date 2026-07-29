@@ -30,6 +30,7 @@ class RepoProfile:
     apple: bool = False
     apple_working_directory: str = ""
     apple_scheme: str = ""
+    apple_build_system: str = ""
 
 
 def detect_profile(files: set[str]) -> RepoProfile:
@@ -44,8 +45,13 @@ def detect_profile(files: set[str]) -> RepoProfile:
         or any(path.endswith(".py") for path in files)
     )
     node = "package.json" in basenames
-    tests = any(part.startswith(("test", "tests")) for path in files for part in path.split("/"))
+    tests = any(
+        part.lower().startswith(("test", "tests")) for path in files for part in path.split("/")
+    )
     apple_dir, apple_scheme = detect_apple_project(files)
+    apple_build_system = (
+        "swift-package" if apple_dir == "." and "Package.swift" in files else "xcodebuild"
+    ) if apple_dir else ""
     parts = []
     if python:
         parts.append("python")
@@ -62,6 +68,7 @@ def detect_profile(files: set[str]) -> RepoProfile:
         apple=bool(apple_dir),
         apple_working_directory=apple_dir,
         apple_scheme=apple_scheme,
+        apple_build_system=apple_build_system,
     )
 
 
@@ -91,6 +98,9 @@ def detect_apple_project(files: set[str]) -> tuple[str, str]:
 
     if any(path.startswith(("ios/", "macos/", "iOS/", "macOS/")) for path in files):
         return "ios" if any(path.startswith(("ios/", "iOS/")) for path in files) else "macos", ""
+
+    if "Package.swift" in files and any(path.startswith("Sources/") for path in files):
+        return ".", ""
 
     return "", ""
 
@@ -150,13 +160,18 @@ def render_ci(
         required.append("apple")
         apple_working_directory = profile.apple_working_directory or "."
         apple_scheme = profile.apple_scheme
+        apple_build_system = profile.apple_build_system or "xcodebuild"
+        xcodegen = "false" if apple_build_system == "swift-package" else "true"
         jobs.append(
             "  apple:\n"
-            "    uses: Boothey07/ci-workflows/.github/workflows/apple-ci.yml@v10\n"
+            "    uses: Boothey07/ci-workflows/.github/workflows/apple-ci.yml@v11\n"
             "    with:\n"
             f"      runs-on: '{apple_runs_on}'\n"
+            f'      build-system: "{apple_build_system}"\n'
             f'      working-directory: "{apple_working_directory}"\n'
             f'      scheme: "{apple_scheme}"\n'
+            f"      xcodegen: {xcodegen}\n"
+            f"      run-tests: {'true' if profile.tests else 'false'}\n"
         )
     jobs.append(
         "  quality-gate:\n"
