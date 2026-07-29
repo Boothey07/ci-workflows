@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).parents[1] / "scripts"))
 from rollout_repositories import (  # noqa: E402
     discovered_repositories,
     explicit_repositories,
+    mac_runner_repositories,
     sync_repository,
     sync_repository_with_retry,
 )
@@ -26,6 +27,12 @@ def test_explicit_repositories_reject_other_owners(monkeypatch):
 
     with pytest.raises(ValueError, match="outside Boothey07"):
         explicit_repositories()
+
+
+def test_mac_runner_repositories_normalizes_names(monkeypatch):
+    monkeypatch.setenv("MAC_RUNNER_REPOSITORIES", "bjj-health-app, Boothey07/ios-app")
+
+    assert mac_runner_repositories() == {"Boothey07/bjj-health-app", "Boothey07/ios-app"}
 
 
 def test_discovery_skips_malformed_repository_entries(monkeypatch):

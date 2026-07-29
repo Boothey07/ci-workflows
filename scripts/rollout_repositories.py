@@ -33,6 +33,18 @@ def explicit_repositories() -> set[str]:
     return repositories
 
 
+def mac_runner_repositories() -> set[str]:
+    raw = os.environ.get("MAC_RUNNER_REPOSITORIES", "")
+    names = {item.strip() for item in raw.replace(",", "\n").splitlines() if item.strip()}
+    repositories = {name if "/" in name else f"{OWNER}/{name}" for name in names}
+    invalid = sorted(repo for repo in repositories if repo.split("/", 1)[0] != OWNER)
+    if invalid:
+        raise ValueError(
+            f"MAC_RUNNER_REPOSITORIES contains repositories outside {OWNER}: {', '.join(invalid)}"
+        )
+    return repositories
+
+
 def discovered_repositories(github: GitHub) -> set[str]:
     if os.environ.get("DISABLE_AUTO_DISCOVERY", "false").lower() == "true":
         return set()
@@ -90,9 +102,15 @@ def sync_repository(github: GitHub, repo: str) -> None:
     profile = detect_profile(github.root_files(repo, branch))
     labels = f"self-hosted,linux,x64,vps,{repo.split('/', 1)[1]}"
     runs_on = runner_json("self-hosted", labels)
+    mac_runs_on = None
+    if profile.apple and repo in mac_runner_repositories():
+        mac_labels = f"self-hosted,macOS,ARM64,ios,{repo.split('/', 1)[1]}"
+        mac_runs_on = runner_json("self-hosted", mac_labels)
     files: dict[str, str | None] = {
-        ".github/workflows/ci.yml": render_ci(profile, runs_on, branch),
-        ".github/workflows/post-merge.yml": render_post_merge(profile, runs_on, branch),
+        ".github/workflows/ci.yml": render_ci(profile, runs_on, branch, mac_runs_on),
+        ".github/workflows/post-merge.yml": render_post_merge(
+            profile, runs_on, branch, mac_runs_on
+        ),
         ".github/workflows/pr-review.yml": None,
         ".github/workflows/auto-merge.yml": None,
     }

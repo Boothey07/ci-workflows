@@ -1,0 +1,107 @@
+name: Apple CI (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: 'JSON runner label array for a self-hosted macOS runner.'
+        type: string
+        default: '["self-hosted","macOS","ARM64","ios"]'
+      working-directory:
+        description: 'Directory containing the XcodeGen project.yml or Xcode project.'
+        type: string
+        default: "."
+      xcodegen:
+        description: 'Run xcodegen generate before building.'
+        type: boolean
+        default: true
+      project:
+        description: 'Xcode project path relative to working-directory.'
+        type: string
+        default: ""
+      scheme:
+        description: 'Xcode scheme to build. Defaults to working-directory basename.'
+        type: string
+        default: ""
+      destination:
+        description: 'xcodebuild destination.'
+        type: string
+        default: "generic/platform=iOS Simulator"
+      xcode-select:
+        description: 'Optional DEVELOPER_DIR, e.g. /Applications/Xcode.app/Contents/Developer.'
+        type: string
+        default: ""
+      homebrew-prefix:
+        description: 'Homebrew prefix to add to PATH for launchd-based runners.'
+        type: string
+        default: "/opt/homebrew/bin"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (iOS Simulator, unsigned)
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add Homebrew to PATH
+        if: inputs.homebrew-prefix != ''
+        run: echo "${{ inputs.homebrew-prefix }}" >> "$GITHUB_PATH"
+
+      - name: Select Xcode
+        if: inputs.xcode-select != ''
+        run: echo "DEVELOPER_DIR=${{ inputs.xcode-select }}" >> "$GITHUB_ENV"
+
+      - name: Toolchain versions
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Ensure XcodeGen is available
+        if: inputs.xcodegen
+        run: |
+          if command -v xcodegen >/dev/null 2>&1; then
+            xcodegen --version
+          else
+            brew install xcodegen
+          fi
+
+      - name: Generate Xcode project
+        if: inputs.xcodegen
+        run: xcodegen generate
+
+      - name: Build for simulator (no code signing)
+        env:
+          INPUT_PROJECT: ${{ inputs.project }}
+          INPUT_SCHEME: ${{ inputs.scheme }}
+        run: |
+          set -euo pipefail
+
+          project="$INPUT_PROJECT"
+          if [ -z "$project" ]; then
+            shopt -s nullglob
+            projects=( *.xcodeproj )
+            if [ "${#projects[@]}" -ne 1 ]; then
+              echo "::error::Set input project when working-directory does not contain exactly one .xcodeproj"
+              exit 1
+            fi
+            project="${projects[0]}"
+          fi
+
+          scheme="$INPUT_SCHEME"
+          if [ -z "$scheme" ]; then
+            scheme="$(basename "$PWD")"
+          fi
+
+          xcodebuild build \
+            -project "$project" \
+            -scheme "$scheme" \
+            -destination '${{ inputs.destination }}' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
