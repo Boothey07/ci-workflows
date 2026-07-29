@@ -24,6 +24,18 @@ def test_detects_xcodegen_ios_project():
     assert profile.apple is True
     assert profile.apple_working_directory == "ios/BJJHealth"
     assert profile.apple_scheme == "BJJHealth"
+    assert profile.apple_build_system == "xcodebuild"
+
+
+def test_detects_swift_package_as_apple_project():
+    profile = detect_profile(
+        {"Package.swift", "Sources/App/App.swift", "Tests/AppTests/AppTests.swift"}
+    )
+
+    assert profile.apple is True
+    assert profile.apple_working_directory == "."
+    assert profile.apple_build_system == "swift-package"
+    assert profile.tests is True
 
 
 def test_detects_xcode_project():
@@ -52,9 +64,24 @@ def test_rendered_ci_adds_apple_only_when_runner_enabled():
     )
 
     assert "apple-ci.yml" not in without_runner
-    assert "apple-ci.yml@v10" in with_runner
+    assert "apple-ci.yml@v11" in with_runner
+    assert 'build-system: "xcodebuild"' in with_runner
     assert 'working-directory: "ios/BJJHealth"' in with_runner
     assert "required-jobs: hygiene,secrets,apple" in with_runner
+
+
+def test_rendered_ci_uses_swift_package_mode():
+    profile = RepoProfile("apple", False, False, True, True, ".", "", "swift-package")
+
+    workflow = render_ci(
+        profile,
+        '["self-hosted","linux"]',
+        apple_runs_on='["self-hosted","macOS","ARM64","ios","BatteryControl"]',
+    )
+
+    assert 'build-system: "swift-package"' in workflow
+    assert "xcodegen: false" in workflow
+    assert "run-tests: true" in workflow
 
 
 def test_post_merge_removes_pr_only_hygiene():
