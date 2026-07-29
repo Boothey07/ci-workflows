@@ -74,6 +74,31 @@ def detect_profile(files: set[str]) -> RepoProfile:
 
 def detect_apple_project(files: set[str]) -> tuple[str, str]:
     """Return (working_directory, scheme) for an iOS/macOS project, if obvious."""
+    if ("project.yml" in files or "project.yaml" in files) and any(
+        path.startswith("Sources/") for path in files
+    ):
+        app_swift_targets = sorted(
+            path.split("/", 2)[1]
+            for path in files
+            if path.startswith("Sources/")
+            and path.endswith("/App.swift")
+            and not path.startswith("Sources/Shared/")
+            and not path.split("/", 2)[1].lower().endswith(("widget", "widgets", "tests"))
+        )
+        if app_swift_targets:
+            return ".", app_swift_targets[0]
+
+        app_sources = sorted(
+            path
+            for path in files
+            if path.startswith("Sources/")
+            and path.count("/") >= 2
+            and path.endswith((".swift", ".plist", ".entitlements"))
+        )
+        if app_sources:
+            return ".", app_sources[0].split("/", 2)[1]
+        return ".", ""
+
     project_yamls = sorted(
         path
         for path in files
