@@ -27,6 +27,9 @@ class RepoProfile:
     python: bool
     node: bool
     tests: bool
+    apple: bool = False
+    apple_working_directory: str = ""
+    apple_scheme: str = ""
 
 
 def detect_profile(files: set[str]) -> RepoProfile:
@@ -42,10 +45,54 @@ def detect_profile(files: set[str]) -> RepoProfile:
     )
     node = "package.json" in basenames
     tests = any(part.startswith(("test", "tests")) for path in files for part in path.split("/"))
-    name = (
-        "python-node" if python and node else "python" if python else "node" if node else "generic"
+    apple_dir, apple_scheme = detect_apple_project(files)
+    parts = []
+    if python:
+        parts.append("python")
+    if node:
+        parts.append("node")
+    if apple_dir:
+        parts.append("apple")
+    name = "-".join(parts) if parts else "generic"
+    return RepoProfile(
+        name=name,
+        python=python,
+        node=node,
+        tests=tests,
+        apple=bool(apple_dir),
+        apple_working_directory=apple_dir,
+        apple_scheme=apple_scheme,
     )
-    return RepoProfile(name=name, python=python, node=node, tests=tests)
+
+
+def detect_apple_project(files: set[str]) -> tuple[str, str]:
+    """Return (working_directory, scheme) for an iOS/macOS project, if obvious."""
+    project_yamls = sorted(
+        path
+        for path in files
+        if path.endswith(("/project.yml", "/project.yaml"))
+        and path.startswith(("ios/", "macos/", "iOS/", "macOS/"))
+    )
+    if project_yamls:
+        directory = project_yamls[0].rsplit("/", 1)[0]
+        return directory, directory.rsplit("/", 1)[-1]
+
+    xcode_projects = sorted(
+        path
+        for path in files
+        if path.endswith(".xcodeproj/project.pbxproj")
+        and path.startswith(("ios/", "macos/", "iOS/", "macOS/"))
+    )
+    if xcode_projects:
+        project_dir = xcode_projects[0].rsplit(".xcodeproj/", 1)[0] + ".xcodeproj"
+        directory = project_dir.rsplit("/", 1)[0]
+        project_name = project_dir.rsplit("/", 1)[-1].removesuffix(".xcodeproj")
+        return directory, project_name
+
+    if any(path.startswith(("ios/", "macos/", "iOS/", "macOS/")) for path in files):
+        return "ios" if any(path.startswith(("ios/", "iOS/")) for path in files) else "macos", ""
+
+    return "", ""
 
 
 def runner_json(mode: str, labels: str) -> str:
@@ -57,7 +104,12 @@ def runner_json(mode: str, labels: str) -> str:
     return json.dumps(values, separators=(",", ":"))
 
 
-def render_ci(profile: RepoProfile, runs_on: str, default_branch: str = "main") -> str:
+def render_ci(
+    profile: RepoProfile,
+    runs_on: str,
+    default_branch: str = "main",
+    apple_runs_on: str | None = None,
+) -> str:
     jobs: list[str] = []
     required: list[str] = ["hygiene", "secrets"]
     jobs.extend(
@@ -94,6 +146,18 @@ def render_ci(profile: RepoProfile, runs_on: str, default_branch: str = "main") 
             '      build-command: "npm run build --if-present"\n'
             '      test-command: "npm test --if-present"\n'
         )
+    if profile.apple and apple_runs_on:
+        required.append("apple")
+        apple_working_directory = profile.apple_working_directory or "."
+        apple_scheme = profile.apple_scheme
+        jobs.append(
+            "  apple:\n"
+            "    uses: Boothey07/ci-workflows/.github/workflows/apple-ci.yml@v10\n"
+            "    with:\n"
+            f"      runs-on: '{apple_runs_on}'\n"
+            f'      working-directory: "{apple_working_directory}"\n'
+            f'      scheme: "{apple_scheme}"\n'
+        )
     jobs.append(
         "  quality-gate:\n"
         "    name: Quality Gate\n"
@@ -115,8 +179,13 @@ def render_ci(profile: RepoProfile, runs_on: str, default_branch: str = "main") 
     )
 
 
-def render_post_merge(profile: RepoProfile, runs_on: str, default_branch: str = "main") -> str:
-    ci = render_ci(profile, runs_on, default_branch)
+def render_post_merge(
+    profile: RepoProfile,
+    runs_on: str,
+    default_branch: str = "main",
+    apple_runs_on: str | None = None,
+) -> str:
+    ci = render_ci(profile, runs_on, default_branch, apple_runs_on)
     body = ci.replace("name: CI", "name: Post-merge CI", 1)
     branches = "[master]" if default_branch == "master" else "[main, dev]"
     body = body.replace(
@@ -319,6 +388,16 @@ def main() -> int:
         "--runner-labels", default="self-hosted,linux,x64,vps", help="comma-separated labels"
     )
     parser.add_argument("--force", action="store_true", help="replace existing caller workflows")
+    parser.add_argument(
+        "--enable-apple-ci",
+        action="store_true",
+        help="Attach Apple/Xcode CI when an Apple project is detected.",
+    )
+    parser.add_argument(
+        "--mac-runner-labels",
+        default="self-hosted,macOS,ARM64,ios",
+        help="comma-separated labels for the repo-scoped macOS runner",
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     token = auth_token()
@@ -331,9 +410,14 @@ def main() -> int:
         branch = repo_data["default_branch"]
     profile = detect_profile(github.root_files(args.repo, branch))
     runs_on = runner_json(args.runner, args.runner_labels)
+    apple_runs_on = (
+        runner_json("self-hosted", args.mac_runner_labels) if args.enable_apple_ci else None
+    )
     files = {
-        ".github/workflows/ci.yml": render_ci(profile, runs_on, branch),
-        ".github/workflows/post-merge.yml": render_post_merge(profile, runs_on, branch),
+        ".github/workflows/ci.yml": render_ci(profile, runs_on, branch, apple_runs_on),
+        ".github/workflows/post-merge.yml": render_post_merge(
+            profile, runs_on, branch, apple_runs_on
+        ),
     }
     print(f"{args.repo}: profile={profile.name} branch={branch} runner={args.runner}")
     if args.dry_run:
