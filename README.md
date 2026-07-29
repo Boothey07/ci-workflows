@@ -56,8 +56,7 @@ The normal flow is:
 oak-git start feat/42-description
 # edit, format, lint, test, git add, git commit
 oak-git push
-oak-git pr-open --title "feat(scope): description"
-oak-git review-status --wait 900
+oak-git pr-open --title "feat(scope): description"\noak-git review-status --wait 900
 oak-git merge
 ```
 
