@@ -74,6 +74,7 @@ def detect_profile(files: set[str]) -> RepoProfile:
         apple_working_directory=apple_dir,
         apple_scheme=apple_scheme,
         apple_build_system=apple_build_system,
+        pnpm=pnpm,
     )
 
 
