@@ -25,7 +25,10 @@ jobs:
           app-id: ${{ secrets.REVIEWER_APP_ID }}
           private-key: ${{ secrets.REVIEWER_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
+          # The sync writes .github/workflows/* files, which needs both
+          # Contents and Workflows write on each target repository.
           permission-contents: write
+          permission-workflows: write
 
       - name: Synchronize repository workflows
         env:
