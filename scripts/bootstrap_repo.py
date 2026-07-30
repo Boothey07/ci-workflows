@@ -19,6 +19,9 @@ import urllib.request
 from dataclasses import dataclass
 
 API = "https://api.github.com"
+# Pin every managed-workflow ref in one place so the hourly rollout sync and
+# the bootstrap tool can never drift from the current ci-workflows release tag.
+CI_WORKFLOWS_REF = os.environ.get("CI_WORKFLOWS_REF", "v11")
 
 
 @dataclass(frozen=True)
@@ -139,10 +142,10 @@ def render_ci(
     jobs.extend(
         [
             "  hygiene:\n"
-            "    uses: Boothey07/ci-workflows/.github/workflows/pr-hygiene.yml@v9\n"
+            f"    uses: Boothey07/ci-workflows/.github/workflows/pr-hygiene.yml@{CI_WORKFLOWS_REF}\n"
             f"    with:\n      runs-on: '{runs_on}'\n",
             "  secrets:\n"
-            "    uses: Boothey07/ci-workflows/.github/workflows/secrets.yml@v9\n"
+            f"    uses: Boothey07/ci-workflows/.github/workflows/secrets.yml@{CI_WORKFLOWS_REF}\n"
             f"    with:\n      runs-on: '{runs_on}'\n",
         ]
     )
@@ -150,7 +153,7 @@ def render_ci(
         required.append("python")
         jobs.append(
             "  python:\n"
-            "    uses: Boothey07/ci-workflows/.github/workflows/python-ci.yml@v9\n"
+            f"    uses: Boothey07/ci-workflows/.github/workflows/python-ci.yml@{CI_WORKFLOWS_REF}\n"
             "    with:\n"
             '      paths: "."\n'
             '      lint-paths: "."\n'
@@ -162,7 +165,7 @@ def render_ci(
         required.append("frontend")
         jobs.append(
             "  frontend:\n"
-            "    uses: Boothey07/ci-workflows/.github/workflows/node-ci.yml@v9\n"
+            f"    uses: Boothey07/ci-workflows/.github/workflows/node-ci.yml@{CI_WORKFLOWS_REF}\n"
             "    with:\n"
             f"      runs-on: '{runs_on}'\n"
             '      install-command: "npm ci"\n'
@@ -178,7 +181,7 @@ def render_ci(
         xcodegen = "false" if apple_build_system == "swift-package" else "true"
         jobs.append(
             "  apple:\n"
-            "    uses: Boothey07/ci-workflows/.github/workflows/apple-ci.yml@v11\n"
+            f"    uses: Boothey07/ci-workflows/.github/workflows/apple-ci.yml@{CI_WORKFLOWS_REF}\n"
             "    with:\n"
             f"      runs-on: '{apple_runs_on}'\n"
             f'      build-system: "{apple_build_system}"\n'
@@ -192,7 +195,7 @@ def render_ci(
         "    name: Quality Gate\n"
         "    if: always()\n"
         f"    needs: [{', '.join(required)}]\n"
-        "    uses: Boothey07/ci-workflows/.github/workflows/quality-gate.yml@v9\n"
+        f"    uses: Boothey07/ci-workflows/.github/workflows/quality-gate.yml@{CI_WORKFLOWS_REF}\n"
         "    with:\n"
         "      results: ${{ toJSON(needs) }}\n"
         f"      required-jobs: {','.join(required)}\n"

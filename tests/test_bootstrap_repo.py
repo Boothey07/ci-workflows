@@ -64,8 +64,8 @@ def test_rendered_ci_has_only_detected_required_jobs():
 
     assert "jobs:\n" in workflow
     assert "pull-requests: read" in workflow
-    assert "python-ci.yml@v9" in workflow
-    assert "node-ci.yml@v9" not in workflow
+    assert "python-ci.yml@v11" in workflow
+    assert "node-ci.yml@v11" not in workflow
     assert "required-jobs: hygiene,secrets,python" in workflow
     assert "run-tests: false" in workflow
 
