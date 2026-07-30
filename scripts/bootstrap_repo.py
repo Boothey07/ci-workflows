@@ -34,6 +34,7 @@ class RepoProfile:
     apple_working_directory: str = ""
     apple_scheme: str = ""
     apple_build_system: str = ""
+    pnpm: bool = False
 
 
 def detect_profile(files: set[str]) -> RepoProfile:
@@ -48,6 +49,7 @@ def detect_profile(files: set[str]) -> RepoProfile:
         or any(path.endswith(".py") for path in files)
     )
     node = "package.json" in basenames
+    pnpm = "pnpm-lock.yaml" in basenames
     tests = any(
         part.lower().startswith(("test", "tests")) for path in files for part in path.split("/")
     )
@@ -163,12 +165,18 @@ def render_ci(
         )
     if profile.node:
         required.append("frontend")
+        # pnpm workspaces need pnpm install, not npm ci (which fails without a
+        # package-lock.json and ignores workspace deps).
+        if profile.pnpm:
+            install_cmd = "npm install -g pnpm && pnpm install"
+        else:
+            install_cmd = "npm ci"
         jobs.append(
             "  frontend:\n"
             f"    uses: Boothey07/ci-workflows/.github/workflows/node-ci.yml@{CI_WORKFLOWS_REF}\n"
             "    with:\n"
             f"      runs-on: '{runs_on}'\n"
-            '      install-command: "npm ci"\n'
+            f'      install-command: "{install_cmd}"\n'
             '      lint-command: "npm run lint --if-present"\n'
             '      build-command: "npm run build --if-present"\n'
             '      test-command: "npm test --if-present"\n'
