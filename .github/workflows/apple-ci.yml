@@ -63,15 +63,18 @@ jobs:
   build:
     name: Apple build
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    env:
-      DERIVED_DATA_PATH: ${{ runner.temp }}/oakfarm-derived-data/${{ github.event.repository.name }}-${{ github.run_id }}-${{ github.run_attempt }}
-      RESULT_BUNDLE_PATH: ${{ runner.temp }}/oakfarm-test-results/${{ github.event.repository.name }}-${{ github.run_id }}-${{ github.run_attempt }}.xcresult
     defaults:
       run:
         shell: bash
         working-directory: ${{ inputs.working-directory }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Prepare isolated build paths
+        run: |
+          repo_name="${GITHUB_REPOSITORY##*/}"
+          echo "DERIVED_DATA_PATH=$RUNNER_TEMP/oakfarm-derived-data/${repo_name}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+          echo "RESULT_BUNDLE_PATH=$RUNNER_TEMP/oakfarm-test-results/${repo_name}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.xcresult" >> "$GITHUB_ENV"
 
       - name: Add Homebrew to PATH
         if: inputs.homebrew-prefix != ''

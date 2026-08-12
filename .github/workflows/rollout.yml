@@ -33,6 +33,7 @@ jobs:
       - name: Synchronize repository workflows
         env:
           GH_TOKEN: ${{ steps.reviewer-app-token.outputs.token }}
+          MAC_RUNNER_REPOSITORIES: ${{ secrets.MAC_RUNNER_REPOSITORIES }}
           MANAGED_REPOSITORIES: ${{ secrets.MANAGED_REPOSITORIES }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: python3 scripts/rollout_repositories.py

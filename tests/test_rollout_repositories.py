@@ -14,6 +14,8 @@ from rollout_repositories import (  # noqa: E402
     sync_repository_with_retry,
 )
 
+ROLLOUT_WORKFLOW = Path(__file__).parents[1] / ".github" / "workflows" / "rollout.yml"
+
 
 class FakeGitHub:
     def __init__(self, responses):
@@ -34,6 +36,12 @@ def test_mac_runner_repositories_normalizes_names(monkeypatch):
     monkeypatch.setenv("MAC_RUNNER_REPOSITORIES", "bjj-health-app, Boothey07/ios-app")
 
     assert mac_runner_repositories() == {"Boothey07/bjj-health-app", "Boothey07/ios-app"}
+
+
+def test_rollout_workflow_passes_mac_runner_repository_secret():
+    workflow = ROLLOUT_WORKFLOW.read_text()
+
+    assert "MAC_RUNNER_REPOSITORIES: ${{ secrets.MAC_RUNNER_REPOSITORIES }}" in workflow
 
 
 def test_runner_repo_label_is_lowercase_and_safe():
