@@ -8,6 +8,8 @@ def test_xcode_projects_run_tests_when_enabled():
 
     assert "xcodebuild test" in workflow
     assert "inputs.run-tests" in workflow
+    assert "xcrun --sdk iphonesimulator --show-sdk-version" in workflow
+    assert 'runtime.get("version") == os.environ["SDK_VERSION"]' in workflow
     assert "-resultBundlePath" in workflow
     assert "actions/upload-artifact@v4" in workflow
 
