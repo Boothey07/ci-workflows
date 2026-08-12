@@ -64,8 +64,8 @@ def test_rendered_ci_has_only_detected_required_jobs():
 
     assert "jobs:\n" in workflow
     assert "pull-requests: read" in workflow
-    assert "python-ci.yml@v11" in workflow
-    assert "node-ci.yml@v11" not in workflow
+    assert "python-ci.yml@v12" in workflow
+    assert "node-ci.yml@v12" not in workflow
     assert "required-jobs: hygiene,secrets,python" in workflow
     assert "run-tests: false" in workflow
 
@@ -81,7 +81,7 @@ def test_rendered_ci_adds_apple_only_when_runner_enabled():
     )
 
     assert "apple-ci.yml" not in without_runner
-    assert "apple-ci.yml@v11" in with_runner
+    assert "apple-ci.yml@v12" in with_runner
     assert 'build-system: "xcodebuild"' in with_runner
     assert 'working-directory: "ios/BJJHealth"' in with_runner
     assert "required-jobs: hygiene,secrets,apple" in with_runner
