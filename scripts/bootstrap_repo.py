@@ -21,7 +21,7 @@ from dataclasses import dataclass
 API = "https://api.github.com"
 # Pin every managed-workflow ref in one place so the hourly rollout sync and
 # the bootstrap tool can never drift from the current ci-workflows release tag.
-CI_WORKFLOWS_REF = os.environ.get("CI_WORKFLOWS_REF", "v12")
+CI_WORKFLOWS_REF = os.environ.get("CI_WORKFLOWS_REF", "v13")
 
 
 @dataclass(frozen=True)
