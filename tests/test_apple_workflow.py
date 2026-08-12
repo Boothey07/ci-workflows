@@ -20,5 +20,7 @@ def test_apple_build_data_is_job_scoped_and_cleaned():
     assert "${{ runner.temp }}" not in workflow
     assert 'DERIVED_DATA_PATH=$RUNNER_TEMP/oakfarm-derived-data/' in workflow
     assert 'RESULT_BUNDLE_PATH=$RUNNER_TEMP/oakfarm-test-results/' in workflow
+    assert "env.RESULT_BUNDLE_PATH != ''" in workflow
+    assert "env.DERIVED_DATA_PATH != ''" in workflow
     assert '"$RUNNER_TEMP"/oakfarm-derived-data/*' in workflow
     assert 'rm -rf "$DERIVED_DATA_PATH"' in workflow

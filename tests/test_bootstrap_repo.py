@@ -42,7 +42,9 @@ def test_detects_root_xcodegen_project():
     profile = detect_profile(
         {
             "project.yml",
+            "Sources/Shared/Alarm.swift",
             "Sources/WakeFlow/App.swift",
+            "Sources/WakeFlow/Info.plist",
             "Sources/WakeFlowWidgets/NextAlarmWidget.swift",
             "Tests/WakeFlowTests/AlarmTests.swift",
         }
@@ -64,8 +66,8 @@ def test_rendered_ci_has_only_detected_required_jobs():
 
     assert "jobs:\n" in workflow
     assert "pull-requests: read" in workflow
-    assert "python-ci.yml@v13" in workflow
-    assert "node-ci.yml@v13" not in workflow
+    assert "python-ci.yml@v14" in workflow
+    assert "node-ci.yml@v14" not in workflow
     assert "required-jobs: hygiene,secrets,python" in workflow
     assert "run-tests: false" in workflow
 
@@ -81,7 +83,7 @@ def test_rendered_ci_adds_apple_only_when_runner_enabled():
     )
 
     assert "apple-ci.yml" not in without_runner
-    assert "apple-ci.yml@v13" in with_runner
+    assert "apple-ci.yml@v14" in with_runner
     assert 'build-system: "xcodebuild"' in with_runner
     assert 'working-directory: "ios/BJJHealth"' in with_runner
     assert "required-jobs: hygiene,secrets,apple" in with_runner
