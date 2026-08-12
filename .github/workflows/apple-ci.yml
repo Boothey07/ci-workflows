@@ -28,9 +28,13 @@ on:
         type: string
         default: ""
       destination:
-        description: 'xcodebuild destination.'
+        description: 'xcodebuild destination used for compile-only jobs.'
         type: string
         default: "generic/platform=iOS Simulator"
+      test-destination:
+        description: 'Optional xcodebuild test destination. Empty selects the first available iPhone simulator.'
+        type: string
+        default: ""
       xcode-select:
         description: 'Optional DEVELOPER_DIR, e.g. /Applications/Xcode.app/Contents/Developer.'
         type: string
@@ -40,7 +44,7 @@ on:
         type: string
         default: "/opt/homebrew/bin"
       run-tests:
-        description: 'Run Swift Package tests after build.'
+        description: 'Run XCTest or Swift Package tests. XCTest includes the simulator build.'
         type: boolean
         default: true
       swift-build-command:
@@ -59,6 +63,9 @@ jobs:
   build:
     name: Apple build
     runs-on: ${{ fromJSON(inputs.runs-on) }}
+    env:
+      DERIVED_DATA_PATH: ${{ runner.temp }}/oakfarm-derived-data/${{ github.event.repository.name }}-${{ github.run_id }}-${{ github.run_attempt }}
+      RESULT_BUNDLE_PATH: ${{ runner.temp }}/oakfarm-test-results/${{ github.event.repository.name }}-${{ github.run_id }}-${{ github.run_attempt }}.xcresult
     defaults:
       run:
         shell: bash
@@ -92,7 +99,8 @@ jobs:
         if: inputs.build-system == 'xcodebuild' && inputs.xcodegen
         run: xcodegen generate
 
-      - name: Build for simulator (no code signing)
+      - name: Resolve Xcode project and scheme
+        id: xcode
         if: inputs.build-system == 'xcodebuild'
         env:
           INPUT_PROJECT: ${{ inputs.project }}
@@ -116,12 +124,61 @@ jobs:
             scheme="$(basename "$PWD")"
           fi
 
+          echo "project=$project" >> "$GITHUB_OUTPUT"
+          echo "scheme=$scheme" >> "$GITHUB_OUTPUT"
+
+      - name: Build for simulator (no code signing)
+        if: inputs.build-system == 'xcodebuild' && inputs.run-tests == false
+        run: |
+          set -euo pipefail
+          mkdir -p "$DERIVED_DATA_PATH"
           xcodebuild build \
-            -project "$project" \
-            -scheme "$scheme" \
+            -project '${{ steps.xcode.outputs.project }}' \
+            -scheme '${{ steps.xcode.outputs.scheme }}' \
             -destination '${{ inputs.destination }}' \
-            -derivedDataPath build \
+            -derivedDataPath "$DERIVED_DATA_PATH" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+
+      - name: Test Xcode scheme
+        if: inputs.build-system == 'xcodebuild' && inputs.run-tests
+        env:
+          INPUT_TEST_DESTINATION: ${{ inputs.test-destination }}
+        run: |
+          set -euo pipefail
+
+          destination="$INPUT_TEST_DESTINATION"
+          if [ -z "$destination" ]; then
+            udid="$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          payload = json.load(sys.stdin)
+          for devices in payload.get("devices", {}).values():
+              for device in devices:
+                  if device.get("isAvailable") and str(device.get("name", "")).startswith("iPhone"):
+                      print(device["udid"])
+                      raise SystemExit(0)
+          raise SystemExit("No available iPhone simulator found")
+          ')"
+            destination="platform=iOS Simulator,id=$udid"
+          fi
+
+          mkdir -p "$DERIVED_DATA_PATH" "$(dirname "$RESULT_BUNDLE_PATH")"
+          rm -rf "$RESULT_BUNDLE_PATH"
+          xcodebuild test \
+            -project '${{ steps.xcode.outputs.project }}' \
+            -scheme '${{ steps.xcode.outputs.scheme }}' \
+            -destination "$destination" \
+            -derivedDataPath "$DERIVED_DATA_PATH" \
+            -resultBundlePath "$RESULT_BUNDLE_PATH" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+
+      - name: Upload XCTest result bundle
+        if: always() && inputs.build-system == 'xcodebuild' && inputs.run-tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.repository.name }}-xctest-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.RESULT_BUNDLE_PATH }}
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Build Swift Package
         if: inputs.build-system == 'swift-package'
@@ -130,3 +187,12 @@ jobs:
       - name: Test Swift Package
         if: inputs.build-system == 'swift-package' && inputs.run-tests
         run: ${{ inputs.swift-test-command }}
+
+      - name: Clean transient Apple build data
+        if: always()
+        run: |
+          set -euo pipefail
+          case "$DERIVED_DATA_PATH" in
+            "$RUNNER_TEMP"/oakfarm-derived-data/*) rm -rf "$DERIVED_DATA_PATH" ;;
+            *) echo "::error::Refusing unsafe cleanup path: $DERIVED_DATA_PATH"; exit 1 ;;
+          esac

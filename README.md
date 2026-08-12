@@ -73,6 +73,7 @@ failure behaviour, bypass boundaries, and rollout.
 |---|---|
 | `python-ci.yml` | ruff lint + format, byte-compile matrix, optional pytest/coverage, advisory mypy + pip-audit |
 | `node-ci.yml` | npm install / lint / build / test |
+| `apple-ci.yml` | Swift Package or unsigned Xcode simulator build/test with isolated DerivedData and XCTest artifacts |
 | `pr-hygiene.yml` | branch naming, Conventional-Commit PR title, verified linked issue |
 | `secrets.yml` | gitleaks (GitHub's own scanning is public-only without GHAS) |
 | `quality-gate.yml` | collapses named upstream jobs into one required result |
