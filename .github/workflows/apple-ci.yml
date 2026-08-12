@@ -151,15 +151,27 @@ jobs:
 
           destination="$INPUT_TEST_DESTINATION"
           if [ -z "$destination" ]; then
-            udid="$(xcrun simctl list devices available -j | python3 -c '
+            sdk_version="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+            runtime_identifier="$(xcrun simctl list runtimes available -j | \
+              SDK_VERSION="$sdk_version" python3 -c '
           import json, sys
+          import os
           payload = json.load(sys.stdin)
-          for devices in payload.get("devices", {}).values():
-              for device in devices:
-                  if device.get("isAvailable") and str(device.get("name", "")).startswith("iPhone"):
-                      print(device["udid"])
-                      raise SystemExit(0)
-          raise SystemExit("No available iPhone simulator found")
+          for runtime in payload.get("runtimes", []):
+              if runtime.get("isAvailable") and runtime.get("version") == os.environ["SDK_VERSION"]:
+                  print(runtime["identifier"])
+                  raise SystemExit(0)
+          raise SystemExit(f"No available iOS Simulator runtime matches SDK {os.environ['"'"'SDK_VERSION'"'"']}")
+          ')"
+            udid="$(xcrun simctl list devices available -j | \
+              RUNTIME_IDENTIFIER="$runtime_identifier" python3 -c '
+          import json, os, sys
+          payload = json.load(sys.stdin)
+          for device in payload.get("devices", {}).get(os.environ["RUNTIME_IDENTIFIER"], []):
+              if device.get("isAvailable") and str(device.get("name", "")).startswith("iPhone"):
+                  print(device["udid"])
+                  raise SystemExit(0)
+          raise SystemExit("No available iPhone found for the selected Xcode SDK")
           ')"
             destination="platform=iOS Simulator,id=$udid"
           fi
