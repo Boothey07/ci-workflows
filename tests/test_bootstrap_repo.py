@@ -15,7 +15,29 @@ from scripts.bootstrap_repo import (  # noqa: E402
 def test_detects_python_node_and_tests_in_nested_paths():
     profile = detect_profile({"api/server.py", "web/package.json", "tests/test_api.py"})
 
-    assert profile == RepoProfile(name="python-node", python=True, node=True, tests=True)
+    assert profile == RepoProfile(
+        name="python-node",
+        python=True,
+        node=True,
+        tests=True,
+        node_working_directory="web",
+    )
+
+
+def test_scopes_node_ci_to_nested_lockfile_project():
+    profile = detect_profile(
+        {
+            "media/ssosvc/package.json",
+            "portal/security-console/package.json",
+            "portal/security-console/package-lock.json",
+        }
+    )
+
+    assert profile.node is True
+    assert profile.node_working_directory == "portal/security-console"
+    assert 'working-directory: "portal/security-console"' in render_ci(
+        profile, '["ubuntu-latest"]'
+    )
 
 
 def test_detects_xcodegen_ios_project():
@@ -66,8 +88,8 @@ def test_rendered_ci_has_only_detected_required_jobs():
 
     assert "jobs:\n" in workflow
     assert "pull-requests: read" in workflow
-    assert "python-ci.yml@v14" in workflow
-    assert "node-ci.yml@v14" not in workflow
+    assert "python-ci.yml@v15" in workflow
+    assert "node-ci.yml@v15" not in workflow
     assert "required-jobs: hygiene,secrets,python" in workflow
     assert "run-tests: false" in workflow
 
@@ -83,7 +105,7 @@ def test_rendered_ci_adds_apple_only_when_runner_enabled():
     )
 
     assert "apple-ci.yml" not in without_runner
-    assert "apple-ci.yml@v14" in with_runner
+    assert "apple-ci.yml@v15" in with_runner
     assert 'build-system: "xcodebuild"' in with_runner
     assert 'working-directory: "ios/BJJHealth"' in with_runner
     assert "required-jobs: hygiene,secrets,apple" in with_runner

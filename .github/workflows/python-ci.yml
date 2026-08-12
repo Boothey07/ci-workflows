@@ -153,9 +153,11 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         working-directory: ${{ inputs.working-directory }}
+        env:
+          INSTALL_COMMAND: ${{ inputs.install-command }}
         run: |
-          if [ -n "${{ inputs.install-command }}" ]; then
-            ${{ inputs.install-command }}
+          if [ -n "$INSTALL_COMMAND" ]; then
+            bash -lc "$INSTALL_COMMAND"
           else
             pip install pytest pytest-cov
           fi

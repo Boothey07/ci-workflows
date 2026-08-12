@@ -21,7 +21,7 @@ from dataclasses import dataclass
 API = "https://api.github.com"
 # Pin every managed-workflow ref in one place so the hourly rollout sync and
 # the bootstrap tool can never drift from the current ci-workflows release tag.
-CI_WORKFLOWS_REF = os.environ.get("CI_WORKFLOWS_REF", "v14")
+CI_WORKFLOWS_REF = os.environ.get("CI_WORKFLOWS_REF", "v15")
 
 
 @dataclass(frozen=True)
@@ -35,6 +35,7 @@ class RepoProfile:
     apple_scheme: str = ""
     apple_build_system: str = ""
     pnpm: bool = False
+    node_working_directory: str = "."
 
 
 def detect_profile(files: set[str]) -> RepoProfile:
@@ -48,8 +49,23 @@ def detect_profile(files: set[str]) -> RepoProfile:
         )
         or any(path.endswith(".py") for path in files)
     )
-    node = "package.json" in basenames
-    pnpm = "pnpm-lock.yaml" in basenames
+    package_jsons = sorted(path for path in files if path.endswith("package.json"))
+    node = bool(package_jsons)
+    node_working_directory = "."
+    if "package.json" not in files and package_jsons:
+        lock_names = ("package-lock.json", "pnpm-lock.yaml", "yarn.lock")
+        locked_projects = []
+        for package_json in package_jsons:
+            directory = package_json.rsplit("/", 1)[0]
+            if any(f"{directory}/{lock_name}" in files for lock_name in lock_names):
+                locked_projects.append(directory)
+        node_working_directory = locked_projects[0] if locked_projects else package_jsons[0].rsplit("/", 1)[0]
+    selected_pnpm_lock = (
+        "pnpm-lock.yaml"
+        if node_working_directory == "."
+        else f"{node_working_directory}/pnpm-lock.yaml"
+    )
+    pnpm = selected_pnpm_lock in files
     tests = any(
         part.lower().startswith(("test", "tests")) for path in files for part in path.split("/")
     )
@@ -75,6 +91,7 @@ def detect_profile(files: set[str]) -> RepoProfile:
         apple_scheme=apple_scheme,
         apple_build_system=apple_build_system,
         pnpm=pnpm,
+        node_working_directory=node_working_directory,
     )
 
 
@@ -186,6 +203,7 @@ def render_ci(
             f"    uses: Boothey07/ci-workflows/.github/workflows/node-ci.yml@{CI_WORKFLOWS_REF}\n"
             "    with:\n"
             f"      runs-on: '{runs_on}'\n"
+            f'      working-directory: "{profile.node_working_directory}"\n'
             f'      install-command: "{install_cmd}"\n'
             '      lint-command: "npm run lint --if-present"\n'
             '      build-command: "npm run build --if-present"\n'
