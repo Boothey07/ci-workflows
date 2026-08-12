@@ -21,7 +21,7 @@ from dataclasses import dataclass
 API = "https://api.github.com"
 # Pin every managed-workflow ref in one place so the hourly rollout sync and
 # the bootstrap tool can never drift from the current ci-workflows release tag.
-CI_WORKFLOWS_REF = os.environ.get("CI_WORKFLOWS_REF", "v13")
+CI_WORKFLOWS_REF = os.environ.get("CI_WORKFLOWS_REF", "v14")
 
 
 @dataclass(frozen=True)
@@ -83,6 +83,15 @@ def detect_apple_project(files: set[str]) -> tuple[str, str]:
     if ("project.yml" in files or "project.yaml" in files) and any(
         path.startswith("Sources/") for path in files
     ):
+        info_plists = sorted(
+            path
+            for path in files
+            if path.startswith("Sources/")
+            and path.count("/") >= 2
+            and path.endswith("/Info.plist")
+        )
+        if info_plists:
+            return ".", info_plists[0].split("/", 2)[1]
         app_sources = sorted(
             path
             for path in files
