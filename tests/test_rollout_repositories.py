@@ -25,6 +25,35 @@ class FakeGitHub:
         return next(self.responses)
 
 
+class RecordingSyncGitHub:
+    def __init__(self):
+        self.files = None
+
+    def request(self, method, path):
+        assert method == "GET"
+        assert path == "/repos/Boothey07/odds-workshop"
+        return 200, {
+            "owner": {"login": "Boothey07"},
+            "archived": False,
+            "default_branch": "main",
+        }
+
+    def root_files(self, repo, branch):
+        assert repo == "Boothey07/odds-workshop"
+        assert branch == "main"
+        return {
+            "backend/pyproject.toml",
+            "package.json",
+            "package-lock.json",
+            "OddsWorkshop/OddsWorkshop.xcodeproj/project.pbxproj",
+            "backend/tests/test_store.py",
+        }
+
+    def write_files(self, repo, branch, files, message, force):
+        self.files = files
+        return {path: "updated" for path in files}
+
+
 def test_explicit_repositories_reject_other_owners(monkeypatch):
     monkeypatch.setenv("MANAGED_REPOSITORIES", "example,OtherOwner/unsafe")
 
@@ -125,3 +154,26 @@ def test_sync_retries_transient_repository_failure(monkeypatch):
     sync_repository_with_retry(object(), "Boothey07/example")
 
     assert calls == ["Boothey07/example"] * 3
+
+
+def test_odds_workshop_rollout_preserves_repo_specific_release_gates(monkeypatch):
+    github = RecordingSyncGitHub()
+    monkeypatch.setenv("MAC_RUNNER_REPOSITORIES", "Boothey07/odds-workshop")
+
+    sync_repository(github, "Boothey07/odds-workshop")
+
+    assert github.files is not None
+    ci = github.files[".github/workflows/ci.yml"]
+    post_merge = github.files[".github/workflows/post-merge.yml"]
+
+    for workflow in (ci, post_merge):
+        assert "python: [\"3.12\", \"3.13\"]" in workflow
+        assert "uses: ./.github/actions/backend-ci" in workflow
+        assert "npm ci && npx playwright-core install chromium" in workflow
+        assert "npm test --if-present && npm run test:e2e" in workflow
+        assert "runs-on: [self-hosted, macOS, odds-workshop]" in workflow
+        assert "./scripts/test-ios.sh" in workflow
+        assert "cancel-in-progress: true" in workflow
+
+    assert "required-jobs: hygiene,secrets,python,frontend,ios" in ci
+    assert "required-jobs: secrets,python,frontend,ios" in post_merge
